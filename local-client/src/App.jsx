@@ -3,6 +3,14 @@ import { Search, PlusCircle, ShieldCheck, Tag, MapPin, Calendar, X, CheckCircle,
 
 const API_URL = 'https://findit-backend-lnq4.onrender.com';
 
+// Image mapping per category
+const CATEGORY_IMAGES = {
+  'Electronics': 'https://images.unsplash.com/photo-1526738549149-8e07eca6c147?w=500&q=80',
+  'IDs & Documents': 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=500&q=80',
+  'Personal Items': 'https://images.unsplash.com/photo-1553062407-98eeb64c6a62?w=500&q=80',
+  'Keys & Wallets': 'https://images.unsplash.com/photo-1627123424574-724758594e93?w=500&q=80'
+};
+
 export default function App() {
   const [currentUser, setCurrentUser] = useState(null);
   const [authMode, setAuthMode] = useState(null); // 'login' or 'signup'
@@ -71,6 +79,9 @@ export default function App() {
     e.preventDefault();
     if (!newItem.title || !newItem.location) return;
 
+    // Assign dynamic image based on selected category
+    const selectedImageUrl = CATEGORY_IMAGES[newItem.category] || CATEGORY_IMAGES['Personal Items'];
+
     try {
       const res = await fetch(`${API_URL}/api/items`, {
         method: 'POST',
@@ -78,12 +89,20 @@ export default function App() {
         body: JSON.stringify({
           ...newItem,
           postedBy: currentUser ? currentUser.name : 'Guest User',
-          imageUrl: 'https://images.unsplash.com/photo-1526738549149-8e07eca6c147?w=500&q=80'
+          imageUrl: selectedImageUrl
         })
       });
       if (res.ok) {
         setIsReportModalOpen(false);
-        setNewItem({ title: '', category: 'Electronics', status: 'Found', location: '', description: '', postedBy: '', dateLostOrFound: new Date().toISOString().split('T')[0] });
+        setNewItem({ 
+          title: '', 
+          category: 'Electronics', 
+          status: 'Found', 
+          location: '', 
+          description: '', 
+          postedBy: '', 
+          dateLostOrFound: new Date().toISOString().split('T')[0] 
+        });
         fetchItems();
       }
     } catch (err) {
