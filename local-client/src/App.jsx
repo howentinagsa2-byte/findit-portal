@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Search, PlusCircle, ShieldCheck, Tag, MapPin, Calendar, X, CheckCircle, AlertCircle, User, LogOut, LayoutDashboard, Trash2, CheckSquare, Settings, Clock } from 'lucide-react';
+import { Search, PlusCircle, ShieldCheck, Tag, MapPin, Calendar, X, CheckCircle, AlertCircle, User, LogOut, LayoutDashboard, Trash2, CheckSquare, Settings, Clock, Bell } from 'lucide-react';
 import LoginPage from './LoginPage';
 
 const API_URL = 'https://findit-backend-lnq4.onrender.com';
@@ -23,6 +23,7 @@ export default function App() {
 
   const [isReportModalOpen, setIsReportModalOpen] = useState(false);
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
+  const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const [selectedItemForAction, setSelectedItemForAction] = useState(null);
   const [actionSuccessMessage, setActionSuccessMessage] = useState('');
 
@@ -63,6 +64,14 @@ export default function App() {
   }, [activeTab, statusFilter, searchQuery, sortBy, currentView]);
 
   const isAdmin = currentUser && currentUser.email.toLowerCase() === 'finditadmin@gmail.com';
+
+  // Compute user notifications from items
+  const userNotifications = currentUser && !isAdmin ? items.filter(i => 
+    i.claimProof && 
+    i.claimProof.submitterEmail && 
+    i.claimProof.submitterEmail.toLowerCase() === currentUser.email.toLowerCase() &&
+    (i.status === 'Resolved' || i.status === 'Claim Pending')
+  ) : [];
 
   const handleOpenReportModal = () => {
     if (!currentUser) {
@@ -167,7 +176,7 @@ export default function App() {
       if (res.ok) {
         setActionSuccessMessage(
           selectedItemForAction.status === 'Found'
-            ? 'Claim submitted successfully! Security will review your ownership proof and email you.'
+            ? 'Claim submitted successfully! Security will review your ownership proof.'
             : 'Found report submitted! The owner and security have been notified.'
         );
         setTimeout(() => {
@@ -246,15 +255,57 @@ export default function App() {
             )}
 
             {currentUser && !isAdmin && (
-              <button 
-                onClick={() => setCurrentView(currentView === 'my-activity' ? 'catalog' : 'my-activity')}
-                className={`flex items-center space-x-1.5 px-3.5 py-2 rounded-xl text-xs font-bold transition cursor-pointer ${
-                  currentView === 'my-activity' ? 'bg-indigo-600 text-white shadow-md' : 'bg-indigo-900/80 text-indigo-200 border border-indigo-700'
-                }`}
-              >
-                <Clock className="h-4 w-4" />
-                <span>{currentView === 'my-activity' ? 'View Catalog' : 'My Activity'}</span>
-              </button>
+              <>
+                <button 
+                  onClick={() => setCurrentView(currentView === 'my-activity' ? 'catalog' : 'my-activity')}
+                  className={`flex items-center space-x-1.5 px-3.5 py-2 rounded-xl text-xs font-bold transition cursor-pointer ${
+                    currentView === 'my-activity' ? 'bg-indigo-600 text-white shadow-md' : 'bg-indigo-900/80 text-indigo-200 border border-indigo-700'
+                  }`}
+                >
+                  <Clock className="h-4 w-4" />
+                  <span>{currentView === 'my-activity' ? 'View Catalog' : 'My Activity'}</span>
+                </button>
+
+                <div className="relative">
+                  <button 
+                    onClick={() => setIsNotificationsOpen(!isNotificationsOpen)}
+                    className="relative p-2.5 bg-indigo-900 hover:bg-indigo-800 text-indigo-200 hover:text-white rounded-xl transition cursor-pointer"
+                    title="Notifications"
+                  >
+                    <Bell className="h-4 w-4" />
+                    {userNotifications.length > 0 && (
+                      <span className="absolute -top-1 -right-1 bg-rose-500 text-white text-[10px] font-black w-4 h-4 rounded-full flex items-center justify-center border-2 border-indigo-950">
+                        {userNotifications.length}
+                      </span>
+                    )}
+                  </button>
+
+                  {isNotificationsOpen && (
+                    <div className="absolute right-0 mt-2 w-80 bg-white rounded-2xl shadow-2xl border border-slate-200 py-3 z-50 text-slate-800">
+                      <div className="px-4 pb-2 border-b border-slate-100 flex items-center justify-between">
+                        <span className="font-bold text-xs uppercase text-slate-500">Notifications</span>
+                        <span className="text-[10px] bg-indigo-50 text-indigo-700 font-bold px-2 py-0.5 rounded-full">{userNotifications.length} updates</span>
+                      </div>
+                      <div className="max-h-64 overflow-y-auto divide-y divide-slate-100">
+                        {userNotifications.length === 0 ? (
+                          <div className="p-6 text-center text-xs text-slate-400">No new notifications.</div>
+                        ) : (
+                          userNotifications.map(n => (
+                            <div key={n._id} className="p-3.5 hover:bg-slate-50 transition text-xs">
+                              <p className="font-bold text-slate-900 mb-0.5">{n.title}</p>
+                              <p className="text-slate-600">
+                                {n.status === 'Resolved' 
+                                  ? '🎉 Your claim has been verified by Security! Visit the security desk.'
+                                  : '⏳ Your claim is currently pending review by security.'}
+                              </p>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </>
             )}
 
             {currentUser ? (
