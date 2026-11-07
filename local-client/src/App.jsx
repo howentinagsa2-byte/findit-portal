@@ -12,7 +12,6 @@ const CATEGORY_IMAGES = {
 };
 
 export default function App() {
-  // Persist user session across page refreshes using localStorage
   const [currentUser, setCurrentUser] = useState(() => {
     const savedUser = localStorage.getItem('findit_current_user');
     return savedUser ? JSON.parse(savedUser) : null;
@@ -73,6 +72,7 @@ export default function App() {
     try {
       const res = await fetch(`${API_URL}/api/notifications?email=${encodeURIComponent(currentUser.email)}`);
       const data = await res.json();
+      console.log('Fetched notifications:', data); // Check your browser console (F12) to see what comes back
       setUserNotifications(data);
     } catch (err) {
       console.error('Failed to fetch notifications:', err);
@@ -86,7 +86,6 @@ export default function App() {
     }
   }, [activeTab, statusFilter, searchQuery, sortBy, currentView]);
 
-  // Real-time background polling for student notifications every 10 seconds
   useEffect(() => {
     if (!currentUser || currentUser.email.toLowerCase() === 'finditadmin@gmail.com') return;
     const interval = setInterval(() => {
@@ -844,7 +843,7 @@ export default function App() {
                     className="px-4 py-2.5 border border-slate-200 text-slate-600 rounded-xl text-sm font-semibold hover:bg-slate-50 cursor-pointer"
                   >
                     Cancel
-                  </button>
+                </button>
                   <button 
                     type="submit"
                     className="px-5 py-2.5 bg-indigo-600 text-white rounded-xl text-sm font-semibold hover:bg-indigo-500 shadow-md cursor-pointer"
