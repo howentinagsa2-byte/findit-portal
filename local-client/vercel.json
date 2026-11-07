@@ -1,0 +1,8 @@
+{
+  "rewrites": [
+    {
+      "source": "/api/:path*",
+      "destination": "https://findit-backend-lnq4.onrender.com/api/:path*"
+    }
+  ]
+}
