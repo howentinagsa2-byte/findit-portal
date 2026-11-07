@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { Search, PlusCircle, ShieldCheck, Tag, MapPin, Calendar, X, CheckCircle, AlertCircle, User, LogOut, LayoutDashboard, Trash2, CheckSquare } from 'lucide-react';
+import LoginPage from './LoginPage';
 
 const API_URL = 'https://findit-backend-lnq4.onrender.com';
 
-// Image mapping per category
 const CATEGORY_IMAGES = {
   'Electronics': 'https://images.unsplash.com/photo-1526738549149-8e07eca6c147?w=500&q=80',
   'IDs & Documents': 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=500&q=80',
@@ -13,14 +13,10 @@ const CATEGORY_IMAGES = {
 
 export default function App() {
   const [currentUser, setCurrentUser] = useState(null);
-  const [authMode, setAuthMode] = useState(null); // 'login' or 'signup'
-  const [authForm, setAuthForm] = useState({ name: '', email: '', password: '', role: 'Student' });
-  const [authError, setAuthError] = useState('');
-
   const [activeTab, setActiveTab] = useState('All Items');
   const [searchQuery, setSearchQuery] = useState('');
   const [items, setItems] = useState([]);
-  const [currentView, setCurrentView] = useState('catalog'); // 'catalog' or 'admin'
+  const [currentView, setCurrentView] = useState('catalog'); // 'catalog', 'admin', or 'login'
 
   const [isReportModalOpen, setIsReportModalOpen] = useState(false);
   const [selectedItemForClaim, setSelectedItemForClaim] = useState(null);
@@ -53,33 +49,10 @@ export default function App() {
     fetchItems();
   }, [activeTab, searchQuery]);
 
-  const handleAuthSubmit = async (e) => {
-    e.preventDefault();
-    setAuthError('');
-    const endpoint = authMode === 'login' ? '/api/auth/login' : '/api/auth/signup';
-
-    try {
-      const res = await fetch(`${API_URL}${endpoint}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(authForm)
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Authentication failed');
-
-      setCurrentUser(data.user);
-      setAuthMode(null);
-      setAuthForm({ name: '', email: '', password: '', role: 'Student' });
-    } catch (err) {
-      setAuthError(err.message);
-    }
-  };
-
   const handleAddItem = async (e) => {
     e.preventDefault();
     if (!newItem.title || !newItem.location) return;
 
-    // Assign dynamic image based on selected category
     const selectedImageUrl = CATEGORY_IMAGES[newItem.category] || CATEGORY_IMAGES['Personal Items'];
 
     try {
@@ -155,6 +128,19 @@ export default function App() {
 
   const isAdmin = currentUser && currentUser.email.toLowerCase() === 'finditadmin@gmail.com';
 
+  // Standalone Login Page View
+  if (currentView === 'login') {
+    return (
+      <LoginPage
+        onLoginSuccess={(user) => {
+          setCurrentUser(user);
+          setCurrentView(user.email.toLowerCase() === 'finditadmin@gmail.com' ? 'admin' : 'catalog');
+        }}
+        onCancel={() => setCurrentView('catalog')}
+      />
+    );
+  }
+
   return (
     <div className="min-h-screen bg-slate-50 text-slate-800 font-sans pb-12">
       {/* Top Header */}
@@ -198,20 +184,12 @@ export default function App() {
                 </button>
               </div>
             ) : (
-              <div className="flex items-center space-x-2">
-                <button 
-                  onClick={() => setAuthMode('login')}
-                  className="px-4 py-2 text-xs font-bold text-indigo-200 hover:text-white transition cursor-pointer"
-                >
-                  Log In
-                </button>
-                <button 
-                  onClick={() => setAuthMode('signup')}
-                  className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold transition shadow-sm cursor-pointer"
-                >
-                  Sign Up
-                </button>
-              </div>
+              <button 
+                onClick={() => setCurrentView('login')}
+                className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold transition shadow-sm cursor-pointer"
+              >
+                Sign In / Register
+              </button>
             )}
 
             <button 
@@ -252,7 +230,7 @@ export default function App() {
               </div>
             </div>
 
-            {/* Admin Table / List */}
+            {/* Admin Table */}
             <div className="bg-white rounded-2xl shadow-sm border border-slate-200/80 overflow-hidden">
               <div className="px-6 py-4 border-b border-slate-100 font-bold text-slate-900 text-sm flex items-center justify-between">
                 <span>All Registry Items & Claims</span>
@@ -416,88 +394,6 @@ export default function App() {
           </>
         )}
       </main>
-
-      {/* MODAL: Login / Sign Up */}
-      {authMode && (
-        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 relative border border-slate-100">
-            <button 
-              onClick={() => { setAuthMode(null); setAuthError(''); }}
-              className="absolute top-4 right-4 text-slate-400 hover:text-slate-600 cursor-pointer p-1"
-            >
-              <X className="h-5 w-5" />
-            </button>
-            <h3 className="text-xl font-bold text-slate-900 mb-1">
-              {authMode === 'login' ? 'Welcome Back to FindIt' : 'Create an Account'}
-            </h3>
-            <p className="text-xs text-slate-500 mb-5">
-              {authMode === 'login' ? 'Enter your credentials to access your portal.' : 'Register to submit claims or manage listings.'}
-            </p>
-
-            {authError && (
-              <div className="mb-4 bg-rose-50 border border-rose-200 text-rose-700 p-3 rounded-xl text-xs font-medium">
-                {authError}
-              </div>
-            )}
-
-            <form onSubmit={handleAuthSubmit} className="space-y-4">
-              {authMode === 'signup' && (
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">Full Name</label>
-                  <input 
-                    type="text" 
-                    required
-                    placeholder="e.g. Howen Botor Tinagsa"
-                    value={authForm.name}
-                    onChange={(e) => setAuthForm({...authForm, name: e.target.value})}
-                    className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-600 outline-none"
-                  />
-                </div>
-              )}
-
-              <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">Email Address</label>
-                <input 
-                  type="email" 
-                  required
-                  placeholder="name@university.edu"
-                  value={authForm.email}
-                  onChange={(e) => setAuthForm({...authForm, email: e.target.value})}
-                  className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-600 outline-none"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">Password</label>
-                <input 
-                  type="password" 
-                  required
-                  placeholder="••••••••"
-                  value={authForm.password}
-                  onChange={(e) => setAuthForm({...authForm, password: e.target.value})}
-                  className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-600 outline-none"
-                />
-              </div>
-
-              <div className="flex justify-end gap-3 pt-3">
-                <button 
-                  type="button"
-                  onClick={() => { setAuthMode(null); setAuthError(''); }}
-                  className="px-4 py-2.5 border border-slate-200 text-slate-600 rounded-xl text-sm font-semibold hover:bg-slate-50 cursor-pointer"
-                >
-                  Cancel
-                </button>
-                <button 
-                  type="submit"
-                  className="px-5 py-2.5 bg-indigo-600 text-white rounded-xl text-sm font-semibold hover:bg-indigo-500 shadow-md cursor-pointer"
-                >
-                  {authMode === 'login' ? 'Log In' : 'Sign Up'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
 
       {/* MODAL: Report Item */}
       {isReportModalOpen && (
