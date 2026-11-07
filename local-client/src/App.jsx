@@ -12,14 +12,25 @@ const CATEGORY_IMAGES = {
 };
 
 export default function App() {
-  const [currentUser, setCurrentUser] = useState(null);
+  // Persist user session across page refreshes using localStorage
+  const [currentUser, setCurrentUser] = useState(() => {
+    const savedUser = localStorage.getItem('findit_current_user');
+    return savedUser ? JSON.parse(savedUser) : null;
+  });
+
   const [activeTab, setActiveTab] = useState('All Items');
   const [statusFilter, setStatusFilter] = useState('All');
   const [sortBy, setSortBy] = useState('newest');
   const [searchQuery, setSearchQuery] = useState('');
   const [items, setItems] = useState([]);
+  const [userNotifications, setUserNotifications] = useState([]);
   
-  const [currentView, setCurrentView] = useState('login'); // 'login', 'catalog', 'admin', 'my-activity'
+  const [currentView, setCurrentView] = useState(() => {
+    const savedUser = localStorage.getItem('findit_current_user');
+    if (!savedUser) return 'login';
+    const parsed = JSON.parse(savedUser);
+    return parsed.email.toLowerCase() === 'finditadmin@gmail.com' ? 'admin' : 'catalog';
+  });
 
   const [isReportModalOpen, setIsReportModalOpen] = useState(false);
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
@@ -57,21 +68,37 @@ export default function App() {
     }
   };
 
+  const fetchNotifications = async () => {
+    if (!currentUser || currentUser.email.toLowerCase() === 'finditadmin@gmail.com') return;
+    try {
+      const res = await fetch(`${API_URL}/api/notifications?email=${encodeURIComponent(currentUser.email)}`);
+      const data = await res.json();
+      setUserNotifications(data);
+    } catch (err) {
+      console.error('Failed to fetch notifications:', err);
+    }
+  };
+
   useEffect(() => {
     if (currentView !== 'login') {
       fetchItems();
+      fetchNotifications();
     }
   }, [activeTab, statusFilter, searchQuery, sortBy, currentView]);
 
   const isAdmin = currentUser && currentUser.email.toLowerCase() === 'finditadmin@gmail.com';
 
-  // Compute user notifications from items
-  const userNotifications = currentUser && !isAdmin ? items.filter(i => 
-    i.claimProof && 
-    i.claimProof.submitterEmail && 
-    i.claimProof.submitterEmail.toLowerCase() === currentUser.email.toLowerCase() &&
-    (i.status === 'Resolved' || i.status === 'Claim Pending')
-  ) : [];
+  const handleLoginSuccess = (user) => {
+    setCurrentUser(user);
+    localStorage.setItem('findit_current_user', JSON.stringify(user));
+    setCurrentView(user.email.toLowerCase() === 'finditadmin@gmail.com' ? 'admin' : 'catalog');
+  };
+
+  const handleLogout = () => {
+    setCurrentUser(null);
+    localStorage.removeItem('findit_current_user');
+    setCurrentView('login');
+  };
 
   const handleOpenReportModal = () => {
     if (!currentUser) {
@@ -113,6 +140,7 @@ export default function App() {
       if (!res.ok) throw new Error(data.error || 'Failed to update account details');
 
       setCurrentUser(data.user);
+      localStorage.setItem('findit_current_user', JSON.stringify(data.user));
       setSettingsStatus({ error: '', success: 'Account details updated successfully!' });
       setTimeout(() => {
         setIsSettingsModalOpen(false);
@@ -184,6 +212,7 @@ export default function App() {
           setSelectedItemForAction(null);
           setActionProofText('');
           fetchItems();
+          fetchNotifications();
         }, 2500);
       }
     } catch (err) {
@@ -218,10 +247,7 @@ export default function App() {
   if (currentView === 'login') {
     return (
       <LoginPage
-        onLoginSuccess={(user) => {
-          setCurrentUser(user);
-          setCurrentView(user.email.toLowerCase() === 'finditadmin@gmail.com' ? 'admin' : 'catalog');
-        }}
+        onLoginSuccess={handleLoginSuccess}
         onGuestAccess={() => setCurrentView('catalog')}
       />
     );
@@ -268,7 +294,7 @@ export default function App() {
 
                 <div className="relative">
                   <button 
-                    onClick={() => setIsNotificationsOpen(!isNotificationsOpen)}
+                    onClick={() => { setIsNotificationsOpen(!isNotificationsOpen); fetchNotifications(); }}
                     className="relative p-2.5 bg-indigo-900 hover:bg-indigo-800 text-indigo-200 hover:text-white rounded-xl transition cursor-pointer"
                     title="Notifications"
                   >
@@ -324,7 +350,7 @@ export default function App() {
                 </button>
 
                 <button 
-                  onClick={() => { setCurrentUser(null); setCurrentView('login'); }}
+                  onClick={handleLogout}
                   className="p-2 bg-indigo-900 hover:bg-rose-900/80 text-indigo-200 hover:text-white rounded-xl transition cursor-pointer"
                   title="Log Out"
                 >

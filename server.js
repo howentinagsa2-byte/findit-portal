@@ -99,7 +99,7 @@ app.post('/api/auth/login', async (req, res) => {
   }
 });
 
-// Auth Routes: Direct Reset Password (Forgot Password)
+// Auth Routes: Reset Password
 app.post('/api/auth/reset-password', async (req, res) => {
   try {
     const { email, newPassword } = req.body;
@@ -158,6 +158,21 @@ app.get('/api/items', async (req, res) => {
     
     const sortOrder = sort === 'oldest' ? 1 : -1;
     const items = await Item.find(query).sort({ _id: sortOrder });
+    res.json(items);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Notifications Route: Fetch items submitted by a specific user email
+app.get('/api/notifications', async (req, res) => {
+  try {
+    const { email } = req.query;
+    if (!email) return res.json([]);
+    const items = await Item.find({ 
+      'claimProof.submitterEmail': email.toLowerCase(),
+      status: { $in: ['Claim Pending', 'Resolved'] }
+    }).sort({ _id: -1 });
     res.json(items);
   } catch (err) {
     res.status(500).json({ error: err.message });
