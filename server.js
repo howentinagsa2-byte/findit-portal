@@ -164,15 +164,18 @@ app.get('/api/items', async (req, res) => {
   }
 });
 
-// Notifications Route: Fetch items submitted by a specific user email
+// Notifications Route: Case-insensitive email query for student alerts
 app.get('/api/notifications', async (req, res) => {
   try {
     const { email } = req.query;
     if (!email) return res.json([]);
+    
+    const emailRegex = new RegExp(`^${email}$`, 'i');
     const items = await Item.find({ 
-      'claimProof.submitterEmail': email.toLowerCase(),
+      'claimProof.submitterEmail': emailRegex,
       status: { $in: ['Claim Pending', 'Resolved'] }
     }).sort({ _id: -1 });
+    
     res.json(items);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -194,7 +197,14 @@ app.patch('/api/items/:id/claim', async (req, res) => {
     const { submittedBy, submitterEmail, proofText } = req.body;
     const updated = await Item.findByIdAndUpdate(
       req.params.id,
-      { status: 'Claim Pending', claimProof: { submittedBy, submitterEmail, proofText } },
+      { 
+        status: 'Claim Pending', 
+        claimProof: { 
+          submittedBy, 
+          submitterEmail: submitterEmail ? submitterEmail.toLowerCase() : '', 
+          proofText 
+        } 
+      },
       { new: true }
     );
     res.json(updated);
