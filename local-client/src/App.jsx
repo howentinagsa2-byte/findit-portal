@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Search, PlusCircle, ShieldCheck, Tag, MapPin, Calendar, X, CheckCircle, AlertCircle, User, LogOut, Lock, LayoutDashboard, Trash2, CheckSquare } from 'lucide-react';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+const API_URL = import.meta.env.VITE_API_URL || 'https://findit-backend-lnq4.onrender.com';
 
 export default function App() {
   const [currentUser, setCurrentUser] = useState(null);
