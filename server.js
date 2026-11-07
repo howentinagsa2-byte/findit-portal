@@ -7,7 +7,7 @@ const app = express();
 app.use(cors({ origin: '*', credentials: true }));
 app.use(express.json());
 
-// Configure Nodemailer Transporter (Replace with your SMTP details or Gmail App Password)
+// Nodemailer Transporter Configuration
 const transporter = nodemailer.createTransport({
   service: 'gmail',
   auth: {
@@ -27,29 +27,16 @@ mongoose.connect(process.env.MONGO_URI || 'mongodb+srv://...', {
     { name: 'System Admin', password: 'password123', role: 'Admin' },
     { upsert: true, new: true }
   );
-
-  // Feature 3: Automated Item Expiration & Archiving (Runs daily or on boot)
-  try {
-    const thirtyDaysAgo = new Date();
-    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-    const dateString = thirtyDaysAgo.toISOString().split('T')[0];
-    
-    await Item.updateMany(
-      { status: { $in: ['Found', 'Lost'] }, dateLostOrFound: { $lte: dateString } },
-      { $set: { status: 'Expired' } }
-    );
-    console.log('Automated expiration check completed.');
-  } catch (err) {
-    console.error('Expiration check error:', err);
-  }
 }).catch(err => console.error('MongoDB connection error:', err));
 
-// Schemas
+// Schemas with Reset Code Fields
 const userSchema = new mongoose.Schema({
   name: { type: String, required: true },
   email: { type: String, required: true, unique: true },
   password: { type: String, required: true },
-  role: { type: String, default: 'Student' }
+  role: { type: String, default: 'Student' },
+  resetCode: String,
+  resetCodeExpires: Date
 });
 const User = mongoose.model('User', userSchema);
 
@@ -102,7 +89,59 @@ app.post('/api/auth/login', async (req, res) => {
   }
 });
 
-// Auth Routes: Update Account
+// Auth Routes: Step 1 - Request Forgot Password Code
+app.post('/api/auth/forgot-password', async (req, res) => {
+  try {
+    const { email } = req.body;
+    const user = await User.findOne({ email: email.toLowerCase() });
+    if (!user) return res.status(404).json({ error: 'No account found with this email address.' });
+
+    // Generate a random 6-digit code
+    const verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
+    user.resetCode = verificationCode;
+    user.resetCodeExpires = Date.now() + 15 * 60 * 1000; // Code valid for 15 minutes
+    await user.save();
+
+    // Send email via Nodemailer
+    const mailOptions = {
+      from: '"FindIt Security" <finditadmin@gmail.com>',
+      to: user.email,
+      subject: '[FindIt] Password Reset Verification Code',
+      text: `Hello ${user.name},\n\nYou requested a password reset for your FindIt account.\nYour verification code is: ${verificationCode}\n\nThis code will expire in 15 minutes.\n\nIf you did not request this, please ignore this email.`
+    };
+
+    transporter.sendMail(mailOptions, (mailErr) => {
+      if (mailErr) console.error('Email error:', mailErr);
+    });
+
+    res.json({ message: 'Verification code sent to your email successfully.' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Auth Routes: Step 2 - Verify Code & Update Password
+app.post('/api/auth/verify-reset-password', async (req, res) => {
+  try {
+    const { email, code, newPassword } = req.body;
+    const user = await User.findOne({ email: email.toLowerCase() });
+
+    if (!user || user.resetCode !== code || user.resetCodeExpires < Date.now()) {
+      return res.status(400).json({ error: 'Invalid or expired verification code.' });
+    }
+
+    user.password = newPassword;
+    user.resetCode = undefined;
+    user.resetCodeExpires = undefined;
+    await user.save();
+
+    res.json({ message: 'Password reset successful! You can now log in.' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Update Account Settings Route
 app.patch('/api/auth/update-account', async (req, res) => {
   try {
     const { currentEmail, newEmail, newPassword } = req.body;
@@ -122,23 +161,7 @@ app.patch('/api/auth/update-account', async (req, res) => {
     );
 
     if (!updatedUser) return res.status(404).json({ error: 'User account not found.' });
-
     res.json({ user: { name: updatedUser.name, email: updatedUser.email, role: updatedUser.role } });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// Auth Routes: Reset Password
-app.post('/api/auth/reset-password', async (req, res) => {
-  try {
-    const { email, newPassword } = req.body;
-    const user = await User.findOne({ email: email.toLowerCase() });
-    if (!user) return res.status(404).json({ error: 'No account found associated with this email.' });
-
-    user.password = newPassword;
-    await user.save();
-    res.json({ message: 'Password reset successful! You can now log in.' });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -151,9 +174,7 @@ app.get('/api/items', async (req, res) => {
     let query = {};
     if (category && category !== 'All Items') query.category = category;
     if (status && status !== 'All') query.status = status;
-    if (userEmail) {
-      query['claimProof.submitterEmail'] = userEmail.toLowerCase();
-    }
+    if (userEmail) query['claimProof.submitterEmail'] = userEmail.toLowerCase();
     if (search) {
       query.$or = [
         { title: new RegExp(search, 'i') },
@@ -180,7 +201,6 @@ app.post('/api/items', async (req, res) => {
   }
 });
 
-// Feature 1 & 2: Submit Claim / Report Lead & Save Submitter Email
 app.patch('/api/items/:id/claim', async (req, res) => {
   try {
     const { submittedBy, submitterEmail, proofText } = req.body;
@@ -195,23 +215,18 @@ app.patch('/api/items/:id/claim', async (req, res) => {
   }
 });
 
-// Feature 2: Resolve Item and Send Email Notification
 app.patch('/api/items/:id/resolve', async (req, res) => {
   try {
     const updated = await Item.findByIdAndUpdate(req.params.id, { status: 'Resolved' }, { new: true });
     
-    // Send email notification if submitter email exists
     if (updated.claimProof && updated.claimProof.submitterEmail) {
       const mailOptions = {
         from: '"FindIt Campus Security" <finditadmin@gmail.com>',
         to: updated.claimProof.submitterEmail,
         subject: `[FindIt] Your claim for "${updated.title}" has been verified!`,
-        text: `Hello ${updated.claimProof.submittedBy},\n\nYour ownership claim or report for "${updated.title}" has been reviewed and verified by University Security.\n\nPlease visit the Campus Security Desk to retrieve your item.\n\nThank you,\nFindIt Portal System`
+        text: `Hello ${updated.claimProof.submittedBy},\n\nYour claim for "${updated.title}" has been verified by Security.\nPlease visit the Campus Security Desk to retrieve your item.`
       };
-      
-      transporter.sendMail(mailOptions, (mailErr) => {
-        if (mailErr) console.error('Email notification failed:', mailErr);
-      });
+      transporter.sendMail(mailOptions, (err) => { if (err) console.error(err); });
     }
 
     res.json(updated);

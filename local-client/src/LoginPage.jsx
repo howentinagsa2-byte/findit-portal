@@ -1,11 +1,11 @@
 import React, { useState } from 'react';
-import { ShieldCheck, User, Lock, ArrowRight, KeyRound, CheckCircle2 } from 'lucide-react';
+import { ShieldCheck, User, Lock, ArrowRight, KeyRound, CheckCircle2, Mail } from 'lucide-react';
 
 const API_URL = 'https://findit-backend-lnq4.onrender.com';
 
 export default function LoginPage({ onLoginSuccess, onGuestAccess }) {
-  const [authMode, setAuthMode] = useState('login'); // 'login', 'signup', or 'forgot'
-  const [authForm, setAuthForm] = useState({ name: '', email: '', password: '', newPassword: '', role: 'Student' });
+  const [authMode, setAuthMode] = useState('login'); // 'login', 'signup', 'forgot', 'verify-reset'
+  const [authForm, setAuthForm] = useState({ name: '', email: '', password: '', code: '', newPassword: '' });
   const [authError, setAuthError] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
   const [loading, setLoading] = useState(false);
@@ -18,10 +18,21 @@ export default function LoginPage({ onLoginSuccess, onGuestAccess }) {
 
     try {
       if (authMode === 'forgot') {
-        const res = await fetch(`${API_URL}/api/auth/reset-password`, {
+        const res = await fetch(`${API_URL}/api/auth/forgot-password`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email: authForm.email, newPassword: authForm.newPassword })
+          body: JSON.stringify({ email: authForm.email })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Failed to send reset code');
+
+        setSuccessMsg(data.message);
+        setAuthMode('verify-reset');
+      } else if (authMode === 'verify-reset') {
+        const res = await fetch(`${API_URL}/api/auth/verify-reset-password`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: authForm.email, code: authForm.code, newPassword: authForm.newPassword })
         });
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || 'Password reset failed');
@@ -30,7 +41,7 @@ export default function LoginPage({ onLoginSuccess, onGuestAccess }) {
         setTimeout(() => {
           setAuthMode('login');
           setSuccessMsg('');
-          setAuthForm({ name: '', email: '', password: '', newPassword: '', role: 'Student' });
+          setAuthForm({ name: '', email: '', password: '', code: '', newPassword: '' });
         }, 2000);
       } else {
         const endpoint = authMode === 'login' ? '/api/auth/login' : '/api/auth/signup';
@@ -54,7 +65,6 @@ export default function LoginPage({ onLoginSuccess, onGuestAccess }) {
   return (
     <div className="min-h-screen bg-slate-100 flex items-center justify-center p-4 font-sans">
       <div className="max-w-md w-full bg-white rounded-3xl shadow-xl border border-slate-200/80 overflow-hidden">
-        {/* Header */}
         <div className="bg-indigo-950 p-8 text-white text-center">
           <div className="inline-flex bg-indigo-600 p-3.5 rounded-2xl shadow-inner mb-3">
             <ShieldCheck className="h-8 w-8 text-white" />
@@ -63,31 +73,31 @@ export default function LoginPage({ onLoginSuccess, onGuestAccess }) {
           <p className="text-xs text-indigo-200 mt-1">Campus Lost and Found Portal</p>
         </div>
 
-        {/* Auth Mode Tabs */}
-        <div className="flex border-b border-slate-100 bg-slate-50">
-          <button
-            onClick={() => { setAuthMode('login'); setAuthError(''); setSuccessMsg(''); }}
-            className={`flex-1 py-3.5 text-xs font-bold transition cursor-pointer ${
-              authMode === 'login'
-                ? 'bg-white text-indigo-600 border-b-2 border-indigo-600 shadow-sm'
-                : 'text-slate-500 hover:text-slate-800'
-            }`}
-          >
-            Log In
-          </button>
-          <button
-            onClick={() => { setAuthMode('signup'); setAuthError(''); setSuccessMsg(''); }}
-            className={`flex-1 py-3.5 text-xs font-bold transition cursor-pointer ${
-              authMode === 'signup'
-                ? 'bg-white text-indigo-600 border-b-2 border-indigo-600 shadow-sm'
-                : 'text-slate-500 hover:text-slate-800'
-            }`}
-          >
-            Create Account
-          </button>
-        </div>
+        {authMode !== 'forgot' && authMode !== 'verify-reset' && (
+          <div className="flex border-b border-slate-100 bg-slate-50">
+            <button
+              onClick={() => { setAuthMode('login'); setAuthError(''); setSuccessMsg(''); }}
+              className={`flex-1 py-3.5 text-xs font-bold transition cursor-pointer ${
+                authMode === 'login'
+                  ? 'bg-white text-indigo-600 border-b-2 border-indigo-600 shadow-sm'
+                  : 'text-slate-500 hover:text-slate-800'
+              }`}
+            >
+              Log In
+            </button>
+            <button
+              onClick={() => { setAuthMode('signup'); setAuthError(''); setSuccessMsg(''); }}
+              className={`flex-1 py-3.5 text-xs font-bold transition cursor-pointer ${
+                authMode === 'signup'
+                  ? 'bg-white text-indigo-600 border-b-2 border-indigo-600 shadow-sm'
+                  : 'text-slate-500 hover:text-slate-800'
+              }`}
+            >
+              Create Account
+            </button>
+          </div>
+        )}
 
-        {/* Form Body */}
         <div className="p-8">
           {authError && (
             <div className="mb-5 bg-rose-50 border border-rose-200 text-rose-700 p-3.5 rounded-xl text-xs font-medium">
@@ -123,31 +133,65 @@ export default function LoginPage({ onLoginSuccess, onGuestAccess }) {
             <div>
               <label className="block text-xs font-bold text-slate-700 mb-1">Email Address</label>
               <div className="relative">
-                <User className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
                 <input
                   type="email"
                   required
                   placeholder="name@university.edu"
+                  disabled={authMode === 'verify-reset'}
                   value={authForm.email}
                   onChange={(e) => setAuthForm({ ...authForm, email: e.target.value })}
-                  className="w-full pl-10 pr-3.5 py-2.5 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-600 outline-none"
+                  className="w-full pl-10 pr-3.5 py-2.5 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-600 outline-none disabled:bg-slate-100"
                 />
               </div>
             </div>
 
-            {authMode !== 'forgot' ? (
+            {authMode === 'verify-reset' && (
+              <>
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">6-Digit Verification Code</label>
+                  <div className="relative">
+                    <KeyRound className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                    <input
+                      type="text"
+                      required
+                      maxLength="6"
+                      placeholder="Enter 6-digit code"
+                      value={authForm.code}
+                      onChange={(e) => setAuthForm({ ...authForm, code: e.target.value })}
+                      className="w-full pl-10 pr-3.5 py-2.5 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-600 outline-none tracking-widest font-bold"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">New Password</label>
+                  <div className="relative">
+                    <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                    <input
+                      type="password"
+                      required
+                      placeholder="Enter new password"
+                      value={authForm.newPassword}
+                      onChange={(e) => setAuthForm({ ...authForm, newPassword: e.target.value })}
+                      className="w-full pl-10 pr-3.5 py-2.5 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-600 outline-none"
+                    />
+                  </div>
+                </div>
+              </>
+            )}
+
+            {authMode === 'login' && (
               <div>
                 <div className="flex justify-between items-center mb-1">
                   <label className="block text-xs font-bold text-slate-700">Password</label>
-                  {authMode === 'login' && (
-                    <button
-                      type="button"
-                      onClick={() => { setAuthMode('forgot'); setAuthError(''); setSuccessMsg(''); }}
-                      className="text-[11px] font-bold text-indigo-600 hover:underline cursor-pointer"
-                    >
-                      Forgot password?
-                    </button>
-                  )}
+                  <button
+                    type="button"
+                    onClick={() => { setAuthMode('forgot'); setAuthError(''); setSuccessMsg(''); }}
+                    className="text-[11px] font-bold text-indigo-600 hover:underline cursor-pointer"
+                  >
+                    Forgot password?
+                  </button>
                 </div>
                 <div className="relative">
                   <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
@@ -161,17 +205,19 @@ export default function LoginPage({ onLoginSuccess, onGuestAccess }) {
                   />
                 </div>
               </div>
-            ) : (
+            )}
+
+            {authMode === 'signup' && (
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">Enter New Password</label>
+                <label className="block text-xs font-bold text-slate-700 mb-1">Password</label>
                 <div className="relative">
-                  <KeyRound className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                  <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
                   <input
                     type="password"
                     required
-                    placeholder="Enter your new password"
-                    value={authForm.newPassword}
-                    onChange={(e) => setAuthForm({ ...authForm, newPassword: e.target.value })}
+                    placeholder="••••••••"
+                    value={authForm.password}
+                    onChange={(e) => setAuthForm({ ...authForm, password: e.target.value })}
                     className="w-full pl-10 pr-3.5 py-2.5 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-600 outline-none"
                   />
                 </div>
@@ -189,14 +235,16 @@ export default function LoginPage({ onLoginSuccess, onGuestAccess }) {
                   ? 'Log In to Account' 
                   : authMode === 'signup' 
                     ? 'Register Account' 
-                    : 'Reset Password'}
+                    : authMode === 'forgot'
+                      ? 'Send Verification Code'
+                      : 'Verify & Reset Password'}
             </button>
           </form>
 
-          {authMode === 'forgot' && (
+          {(authMode === 'forgot' || authMode === 'verify-reset') && (
             <div className="mt-4 text-center">
               <button
-                onClick={() => { setAuthMode('login'); setAuthError(''); }}
+                onClick={() => { setAuthMode('login'); setAuthError(''); setSuccessMsg(''); }}
                 className="text-xs text-slate-500 hover:text-indigo-600 font-semibold cursor-pointer"
               >
                 ← Back to Log In
@@ -204,7 +252,6 @@ export default function LoginPage({ onLoginSuccess, onGuestAccess }) {
             </div>
           )}
 
-          {/* Continue as Guest */}
           <div className="mt-6 pt-6 border-t border-slate-100 text-center">
             <button
               onClick={onGuestAccess}
