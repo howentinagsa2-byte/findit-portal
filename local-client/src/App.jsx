@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Search, PlusCircle, ShieldCheck, Tag, MapPin, Calendar, X, CheckCircle, AlertCircle, User, LogOut, LayoutDashboard, Trash2, CheckSquare } from 'lucide-react';
+import { Search, PlusCircle, ShieldCheck, Tag, MapPin, Calendar, X, CheckCircle, AlertCircle, User, LogOut, LayoutDashboard, Trash2, CheckSquare, MessageSquare } from 'lucide-react';
 import LoginPage from './LoginPage';
 
 const API_URL = 'https://findit-backend-lnq4.onrender.com';
@@ -17,12 +17,11 @@ export default function App() {
   const [searchQuery, setSearchQuery] = useState('');
   const [items, setItems] = useState([]);
   
-  // Controls current view: 'login', 'catalog', or 'admin'
-  const [currentView, setCurrentView] = useState('login');
+  const [currentView, setCurrentView] = useState('login'); // 'login', 'catalog', or 'admin'
 
   const [isReportModalOpen, setIsReportModalOpen] = useState(false);
-  const [selectedItemForClaim, setSelectedItemForClaim] = useState(null);
-  const [claimSuccessMessage, setClaimSuccessMessage] = useState('');
+  const [selectedItemForAction, setSelectedItemForAction] = useState(null); // Selected item for Claim OR Lead
+  const [actionSuccessMessage, setActionSuccessMessage] = useState('');
 
   const [newItem, setNewItem] = useState({
     title: '',
@@ -34,7 +33,7 @@ export default function App() {
     dateLostOrFound: new Date().toISOString().split('T')[0]
   });
 
-  const [claimProof, setClaimProof] = useState('');
+  const [actionProofText, setActionProofText] = useState('');
   const categories = ['All Items', 'Electronics', 'IDs & Documents', 'Personal Items', 'Keys & Wallets'];
 
   const fetchItems = async () => {
@@ -55,7 +54,7 @@ export default function App() {
 
   const isAdmin = currentUser && currentUser.email.toLowerCase() === 'finditadmin@gmail.com';
 
-  // Strict Guard Action: Only Admin can open Report Item modal
+  // Admin Guard: Only Admin can open Report Item modal
   const handleOpenReportModal = () => {
     if (!currentUser) {
       alert('Please log in with an administrator account to post listings.');
@@ -69,24 +68,20 @@ export default function App() {
     setIsReportModalOpen(true);
   };
 
-  // Guard Action: Students/Users must be logged in to claim items
-  const handleOpenClaimModal = (item) => {
+  // Student Guard: Require login before interacting with listings
+  const handleOpenActionModal = (item) => {
     if (!currentUser) {
-      alert('Please log in or create an account to submit an ownership claim.');
+      alert('Please log in or create an account to respond to this listing.');
       setCurrentView('login');
       return;
     }
-    setSelectedItemForClaim(item);
+    setSelectedItemForAction(item);
   };
 
   const handleAddItem = async (e) => {
     e.preventDefault();
     if (!newItem.title || !newItem.location) return;
-
-    if (!isAdmin) {
-      alert('Unauthorized operation.');
-      return;
-    }
+    if (!isAdmin) return;
 
     const selectedImageUrl = CATEGORY_IMAGES[newItem.category] || CATEGORY_IMAGES['Personal Items'];
 
@@ -118,30 +113,34 @@ export default function App() {
     }
   };
 
-  const handleClaimSubmit = async (e) => {
+  const handleActionSubmit = async (e) => {
     e.preventDefault();
-    if (!claimProof) return;
+    if (!actionProofText) return;
 
     try {
-      const res = await fetch(`${API_URL}/api/items/${selectedItemForClaim._id}/claim`, {
+      const res = await fetch(`${API_URL}/api/items/${selectedItemForAction._id}/claim`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
           submittedBy: currentUser ? currentUser.name : 'Registered Student', 
-          proofText: claimProof 
+          proofText: actionProofText 
         })
       });
       if (res.ok) {
-        setClaimSuccessMessage('Claim submitted successfully! University Security will review your proof.');
+        setActionSuccessMessage(
+          selectedItemForAction.status === 'Found'
+            ? 'Claim submitted successfully! Security will review your ownership proof.'
+            : 'Found report submitted! The owner and security have been notified.'
+        );
         setTimeout(() => {
-          setClaimSuccessMessage('');
-          setSelectedItemForClaim(null);
-          setClaimProof('');
+          setActionSuccessMessage('');
+          setSelectedItemForAction(null);
+          setActionProofText('');
           fetchItems();
         }, 2500);
       }
     } catch (err) {
-      console.error('Failed to submit claim:', err);
+      console.error('Failed to submit response:', err);
     }
   };
 
@@ -169,7 +168,7 @@ export default function App() {
     }
   };
 
-  // Standalone Login Page View
+  // Standalone Login Page
   if (currentView === 'login') {
     return (
       <LoginPage
@@ -257,14 +256,14 @@ export default function App() {
                   Secure Security Control Center
                 </span>
                 <h2 className="text-3xl font-black text-slate-900 tracking-tight">Admin Management Panel</h2>
-                <p className="text-slate-600 text-sm mt-1">Review pending ownership claims, oversee active listings, and manage campus resolutions.</p>
+                <p className="text-slate-600 text-sm mt-1">Review pending ownership claims and found leads, oversee active listings, and resolve items.</p>
               </div>
               <div className="flex gap-3">
                 <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-center min-w-[120px]">
                   <span className="block text-xl font-black text-amber-600">
                     {items.filter(i => i.status === 'Claim Pending').length}
                   </span>
-                  <span className="text-[10px] font-bold text-amber-700 uppercase">Pending Claims</span>
+                  <span className="text-[10px] font-bold text-amber-700 uppercase">Pending Review</span>
                 </div>
                 <div className="bg-indigo-50 border border-indigo-200 rounded-xl p-3 text-center min-w-[120px]">
                   <span className="block text-xl font-black text-indigo-600">{items.length}</span>
@@ -276,7 +275,7 @@ export default function App() {
             {/* Admin Table */}
             <div className="bg-white rounded-2xl shadow-sm border border-slate-200/80 overflow-hidden">
               <div className="px-6 py-4 border-b border-slate-100 font-bold text-slate-900 text-sm flex items-center justify-between">
-                <span>All Registry Items & Claims</span>
+                <span>All Registry Items & Student Submissions</span>
                 <span className="text-xs text-slate-500 font-normal">Authorized Admin: finditadmin@gmail.com</span>
               </div>
               <div className="divide-y divide-slate-100">
@@ -301,7 +300,7 @@ export default function App() {
                         </p>
                         {item.claimProof && item.claimProof.proofText && (
                           <div className="mt-2.5 bg-amber-50 border border-amber-200/70 p-2.5 rounded-xl text-xs text-amber-900">
-                            <span className="font-bold">Claim Proof ({item.claimProof.submittedBy}):</span> "{item.claimProof.proofText}"
+                            <span className="font-bold">Student Note ({item.claimProof.submittedBy}):</span> "{item.claimProof.proofText}"
                           </div>
                         )}
                       </div>
@@ -339,7 +338,7 @@ export default function App() {
                 </span>
                 <h2 className="text-3xl font-black text-slate-900 tracking-tight">Campus Lost & Found Catalog</h2>
                 <p className="text-slate-600 text-sm mt-2 leading-relaxed">
-                  Securely browse lost belongings or submit an ownership claim verified by University Security and Student Services.
+                  Browse items turned into security or report a match if you found a student's lost item.
                 </p>
               </div>
 
@@ -422,11 +421,17 @@ export default function App() {
                           <Calendar className="h-4 w-4 text-slate-400" />
                           <span>{item.dateLostOrFound}</span>
                         </div>
+                        
+                        {/* Dynamic Action Button: Claim Item vs I Found This! */}
                         <button 
-                          onClick={() => handleOpenClaimModal(item)}
-                          className="bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold px-3 py-1.5 rounded-lg transition cursor-pointer"
+                          onClick={() => handleOpenActionModal(item)}
+                          className={`font-bold px-3 py-1.5 rounded-lg transition cursor-pointer text-xs flex items-center gap-1 ${
+                            item.status === 'Found' 
+                              ? 'bg-indigo-50 hover:bg-indigo-100 text-indigo-700' 
+                              : 'bg-emerald-50 hover:bg-emerald-100 text-emerald-700'
+                          }`}
                         >
-                          Claim Item →
+                          {item.status === 'Found' ? 'Claim Item →' : 'I Found This! →'}
                         </button>
                       </div>
                     </div>
@@ -534,39 +539,51 @@ export default function App() {
         </div>
       )}
 
-      {/* MODAL: Submit Claim */}
-      {selectedItemForClaim && (
+      {/* DYNAMIC MODAL: Claim Found Item OR Report Finding a Lost Item */}
+      {selectedItemForAction && (
         <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 relative border border-slate-100">
             <button 
-              onClick={() => setSelectedItemForClaim(null)}
+              onClick={() => setSelectedItemForAction(null)}
               className="absolute top-4 right-4 text-slate-400 hover:text-slate-600 cursor-pointer p-1"
             >
               <X className="h-5 w-5" />
             </button>
-            <h3 className="text-xl font-bold text-slate-900 mb-1">Submit Proof of Ownership</h3>
-            <p className="text-xs text-slate-500 mb-4">Item: <span className="font-semibold text-slate-800">{selectedItemForClaim.title}</span></p>
+            <h3 className="text-xl font-bold text-slate-900 mb-1">
+              {selectedItemForAction.status === 'Found' ? 'Submit Proof of Ownership' : 'Report Found Match'}
+            </h3>
+            <p className="text-xs text-slate-500 mb-4">Item: <span className="font-semibold text-slate-800">{selectedItemForAction.title}</span></p>
 
-            {claimSuccessMessage ? (
+            {actionSuccessMessage ? (
               <div className="bg-emerald-50 border border-emerald-200 text-emerald-800 p-4 rounded-xl flex items-center gap-3 text-sm font-medium">
                 <CheckCircle className="h-5 w-5 text-emerald-600 shrink-0" />
-                <span>{claimSuccessMessage}</span>
+                <span>{actionSuccessMessage}</span>
               </div>
             ) : (
-              <form onSubmit={handleClaimSubmit} className="space-y-4">
+              <form onSubmit={handleActionSubmit} className="space-y-4">
                 <div className="bg-amber-50 border border-amber-200/80 p-3.5 rounded-xl text-xs text-amber-900 flex gap-2.5 leading-relaxed">
                   <AlertCircle className="h-4 w-4 shrink-0 mt-0.5 text-amber-600" />
-                  <span>Please provide hidden identifiers (serial numbers, sticker placements, or specific contents) to verify ownership with security.</span>
+                  <span>
+                    {selectedItemForAction.status === 'Found'
+                      ? 'Please provide hidden identifiers (serial numbers, sticker placements, contents) to verify ownership.'
+                      : 'Let the owner know where you found/saw this item or where you surrendered it (e.g. Security Desk, Room 302).'}
+                  </span>
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">Proof Description</label>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    {selectedItemForAction.status === 'Found' ? 'Proof Description' : 'Found Location & Details'}
+                  </label>
                   <textarea 
                     rows="4"
                     required
-                    placeholder="Describe specific details only the true owner would know..."
-                    value={claimProof}
-                    onChange={(e) => setClaimProof(e.target.value)}
+                    placeholder={
+                      selectedItemForAction.status === 'Found' 
+                        ? 'Describe specific details only the true owner would know...'
+                        : 'Explain where this item is currently located or turned in...'
+                    }
+                    value={actionProofText}
+                    onChange={(e) => setActionProofText(e.target.value)}
                     className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-600 outline-none resize-none"
                   ></textarea>
                 </div>
@@ -574,7 +591,7 @@ export default function App() {
                 <div className="flex justify-end gap-3 pt-3">
                   <button 
                     type="button"
-                    onClick={() => setSelectedItemForClaim(null)}
+                    onClick={() => setSelectedItemForAction(null)}
                     className="px-4 py-2.5 border border-slate-200 text-slate-600 rounded-xl text-sm font-semibold hover:bg-slate-50 cursor-pointer"
                   >
                     Cancel
@@ -583,7 +600,7 @@ export default function App() {
                     type="submit"
                     className="px-5 py-2.5 bg-indigo-600 text-white rounded-xl text-sm font-semibold hover:bg-indigo-500 shadow-md cursor-pointer"
                   >
-                    Submit Claim
+                    {selectedItemForAction.status === 'Found' ? 'Submit Claim' : 'Send Found Report'}
                   </button>
                 </div>
               </form>
