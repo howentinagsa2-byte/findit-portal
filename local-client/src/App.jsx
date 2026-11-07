@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Search, PlusCircle, ShieldCheck, Tag, MapPin, Calendar, X, CheckCircle, AlertCircle, User, LogOut, LayoutDashboard, Trash2, CheckSquare, MessageSquare } from 'lucide-react';
+import { Search, PlusCircle, ShieldCheck, Tag, MapPin, Calendar, X, CheckCircle, AlertCircle, User, LogOut, LayoutDashboard, Trash2, CheckSquare, Settings, Lock } from 'lucide-react';
 import LoginPage from './LoginPage';
 
 const API_URL = 'https://findit-backend-lnq4.onrender.com';
@@ -20,8 +20,13 @@ export default function App() {
   const [currentView, setCurrentView] = useState('login'); // 'login', 'catalog', or 'admin'
 
   const [isReportModalOpen, setIsReportModalOpen] = useState(false);
-  const [selectedItemForAction, setSelectedItemForAction] = useState(null); // Selected item for Claim OR Lead
+  const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
+  const [selectedItemForAction, setSelectedItemForAction] = useState(null);
   const [actionSuccessMessage, setActionSuccessMessage] = useState('');
+
+  // Settings State
+  const [settingsForm, setSettingsForm] = useState({ newEmail: '', newPassword: '' });
+  const [settingsStatus, setSettingsStatus] = useState({ error: '', success: '' });
 
   const [newItem, setNewItem] = useState({
     title: '',
@@ -54,7 +59,6 @@ export default function App() {
 
   const isAdmin = currentUser && currentUser.email.toLowerCase() === 'finditadmin@gmail.com';
 
-  // Admin Guard: Only Admin can open Report Item modal
   const handleOpenReportModal = () => {
     if (!currentUser) {
       alert('Please log in with an administrator account to post listings.');
@@ -68,7 +72,6 @@ export default function App() {
     setIsReportModalOpen(true);
   };
 
-  // Student Guard: Require login before interacting with listings
   const handleOpenActionModal = (item) => {
     if (!currentUser) {
       alert('Please log in or create an account to respond to this listing.');
@@ -76,6 +79,35 @@ export default function App() {
       return;
     }
     setSelectedItemForAction(item);
+  };
+
+  const handleUpdateSettings = async (e) => {
+    e.preventDefault();
+    setSettingsStatus({ error: '', success: '' });
+
+    try {
+      const res = await fetch(`${API_URL}/api/auth/update-account`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          currentEmail: currentUser.email,
+          newEmail: settingsForm.newEmail || currentUser.email,
+          newPassword: settingsForm.newPassword || undefined
+        })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to update account details');
+
+      setCurrentUser(data.user);
+      setSettingsStatus({ error: '', success: 'Account details updated successfully!' });
+      setTimeout(() => {
+        setIsSettingsModalOpen(false);
+        setSettingsForm({ newEmail: '', newPassword: '' });
+        setSettingsStatus({ error: '', success: '' });
+      }, 1800);
+    } catch (err) {
+      setSettingsStatus({ error: err.message, success: '' });
+    }
   };
 
   const handleAddItem = async (e) => {
@@ -168,7 +200,6 @@ export default function App() {
     }
   };
 
-  // Standalone Login Page
   if (currentView === 'login') {
     return (
       <LoginPage
@@ -210,11 +241,20 @@ export default function App() {
             )}
 
             {currentUser ? (
-              <div className="flex items-center space-x-3">
+              <div className="flex items-center space-x-2">
                 <div className="flex items-center space-x-2 bg-indigo-900/80 px-3 py-1.5 rounded-xl border border-indigo-700">
                   <User className="h-4 w-4 text-indigo-300" />
                   <span className="text-xs font-bold">{currentUser.name} {isAdmin && '(Admin)'}</span>
                 </div>
+                
+                <button 
+                  onClick={() => setIsSettingsModalOpen(true)}
+                  className="p-2 bg-indigo-900 hover:bg-indigo-800 text-indigo-200 hover:text-white rounded-xl transition cursor-pointer"
+                  title="Account Settings"
+                >
+                  <Settings className="h-4 w-4" />
+                </button>
+
                 <button 
                   onClick={() => { setCurrentUser(null); setCurrentView('login'); }}
                   className="p-2 bg-indigo-900 hover:bg-rose-900/80 text-indigo-200 hover:text-white rounded-xl transition cursor-pointer"
@@ -245,10 +285,9 @@ export default function App() {
         </div>
       </header>
 
-      {/* Main Container */}
+      {/* Main Catalog / Admin View */}
       <main className="max-w-7xl mx-auto px-6 pt-8">
         {currentView === 'admin' && isAdmin ? (
-          /* ADMIN DASHBOARD VIEW */
           <div className="space-y-6">
             <div className="bg-white rounded-2xl shadow-sm border border-slate-200/80 p-8 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
               <div>
@@ -272,7 +311,6 @@ export default function App() {
               </div>
             </div>
 
-            {/* Admin Table */}
             <div className="bg-white rounded-2xl shadow-sm border border-slate-200/80 overflow-hidden">
               <div className="px-6 py-4 border-b border-slate-100 font-bold text-slate-900 text-sm flex items-center justify-between">
                 <span>All Registry Items & Student Submissions</span>
@@ -329,7 +367,6 @@ export default function App() {
             </div>
           </div>
         ) : (
-          /* PUBLIC CATALOG VIEW */
           <>
             <div className="bg-white rounded-2xl shadow-sm border border-slate-200/80 p-8 mb-8 flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6">
               <div className="max-w-2xl">
@@ -354,7 +391,6 @@ export default function App() {
               </div>
             </div>
 
-            {/* Filter Tabs and Search Bar */}
             <div className="flex flex-col lg:flex-row items-center justify-between gap-4 mb-8">
               <div className="flex flex-wrap gap-2 w-full lg:w-auto">
                 {categories.map((category) => (
@@ -384,7 +420,6 @@ export default function App() {
               </div>
             </div>
 
-            {/* Catalog Grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {items.map((item) => (
                 <div key={item._id} className="bg-white rounded-2xl border border-slate-200/80 shadow-sm hover:shadow-md transition overflow-hidden flex flex-col group">
@@ -422,7 +457,6 @@ export default function App() {
                           <span>{item.dateLostOrFound}</span>
                         </div>
                         
-                        {/* Dynamic Action Button: Only show if status is Found or Lost */}
                         {(item.status === 'Found' || item.status === 'Lost') && (
                           <button 
                             onClick={() => handleOpenActionModal(item)}
@@ -444,6 +478,75 @@ export default function App() {
           </>
         )}
       </main>
+
+      {/* MODAL: Account Settings (Change Email & Password) */}
+      {isSettingsModalOpen && (
+        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 relative border border-slate-100">
+            <button 
+              onClick={() => { setIsSettingsModalOpen(false); setSettingsStatus({ error: '', success: '' }); }}
+              className="absolute top-4 right-4 text-slate-400 hover:text-slate-600 cursor-pointer p-1"
+            >
+              <X className="h-5 w-5" />
+            </button>
+            <h3 className="text-xl font-bold text-slate-900 mb-1">Account Settings</h3>
+            <p className="text-xs text-slate-500 mb-5">Update your email address or account password.</p>
+
+            {settingsStatus.error && (
+              <div className="mb-4 bg-rose-50 border border-rose-200 text-rose-700 p-3 rounded-xl text-xs font-medium">
+                {settingsStatus.error}
+              </div>
+            )}
+
+            {settingsStatus.success && (
+              <div className="mb-4 bg-emerald-50 border border-emerald-200 text-emerald-800 p-3 rounded-xl text-xs font-medium flex items-center gap-2">
+                <CheckCircle className="h-4 w-4 text-emerald-600 shrink-0" />
+                <span>{settingsStatus.success}</span>
+              </div>
+            )}
+
+            <form onSubmit={handleUpdateSettings} className="space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">New Email Address</label>
+                <input 
+                  type="email"
+                  placeholder={currentUser ? currentUser.email : 'Enter new email'}
+                  value={settingsForm.newEmail}
+                  onChange={(e) => setSettingsForm({ ...settingsForm, newEmail: e.target.value })}
+                  className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-600 outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">New Password</label>
+                <input 
+                  type="password"
+                  placeholder="Leave blank to keep current password"
+                  value={settingsForm.newPassword}
+                  onChange={(e) => setSettingsForm({ ...settingsForm, newPassword: e.target.value })}
+                  className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-600 outline-none"
+                />
+              </div>
+
+              <div className="flex justify-end gap-3 pt-3">
+                <button 
+                  type="button"
+                  onClick={() => setIsSettingsModalOpen(false)}
+                  className="px-4 py-2.5 border border-slate-200 text-slate-600 rounded-xl text-sm font-semibold hover:bg-slate-50 cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button 
+                  type="submit"
+                  className="px-5 py-2.5 bg-indigo-600 text-white rounded-xl text-sm font-semibold hover:bg-indigo-500 shadow-md cursor-pointer"
+                >
+                  Save Changes
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* MODAL: Report Item (Admin Only) */}
       {isReportModalOpen && isAdmin && (

@@ -45,14 +45,19 @@ const itemSchema = new mongoose.Schema({
 });
 const Item = mongoose.model('Item', itemSchema);
 
-// Auth Routes
+// Auth Routes: Signup
 app.post('/api/auth/signup', async (req, res) => {
   try {
     const { name, email, password, role } = req.body;
-    let user = await User.findOne({ email });
+    let user = await User.findOne({ email: email.toLowerCase() });
     if (user) return res.status(400).json({ error: 'Email already registered' });
 
-    user = new User({ name, email, password, role: email.toLowerCase() === 'finditadmin@gmail.com' ? 'Admin' : (role || 'Student') });
+    user = new User({ 
+      name, 
+      email: email.toLowerCase(), 
+      password, 
+      role: email.toLowerCase() === 'finditadmin@gmail.com' ? 'Admin' : (role || 'Student') 
+    });
     await user.save();
     res.json({ user: { name: user.name, email: user.email, role: user.role } });
   } catch (err) {
@@ -60,12 +65,68 @@ app.post('/api/auth/signup', async (req, res) => {
   }
 });
 
+// Auth Routes: Login
 app.post('/api/auth/login', async (req, res) => {
   try {
     const { email, password } = req.body;
-    const user = await User.findOne({ email, password });
+    const user = await User.findOne({ email: email.toLowerCase(), password });
     if (!user) return res.status(400).json({ error: 'Invalid email or password' });
     res.json({ user: { name: user.name, email: user.email, role: user.role } });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Auth Routes: Update Account (Change Email & Password)
+app.patch('/api/auth/update-account', async (req, res) => {
+  try {
+    const { currentEmail, newEmail, newPassword } = req.body;
+    
+    if (newEmail && newEmail.toLowerCase() !== currentEmail.toLowerCase()) {
+      const existingUser = await User.findOne({ email: newEmail.toLowerCase() });
+      if (existingUser) {
+        return res.status(400).json({ error: 'New email address is already registered.' });
+      }
+    }
+
+    const updateFields = {};
+    if (newEmail) updateFields.email = newEmail.toLowerCase();
+    if (newPassword) updateFields.password = newPassword;
+
+    const updatedUser = await User.findOneAndUpdate(
+      { email: currentEmail.toLowerCase() },
+      { $set: updateFields },
+      { new: true }
+    );
+
+    if (!updatedUser) return res.status(404).json({ error: 'User account not found.' });
+
+    res.json({
+      user: {
+        name: updatedUser.name,
+        email: updatedUser.email,
+        role: updatedUser.role
+      }
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Auth Routes: Reset Password (Forgot Password)
+app.post('/api/auth/reset-password', async (req, res) => {
+  try {
+    const { email, newPassword } = req.body;
+    const user = await User.findOne({ email: email.toLowerCase() });
+    
+    if (!user) {
+      return res.status(404).json({ error: 'No account found associated with this email.' });
+    }
+
+    user.password = newPassword;
+    await user.save();
+
+    res.json({ message: 'Password reset successful! You can now log in.' });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
