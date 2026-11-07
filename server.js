@@ -1,12 +1,22 @@
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
+const nodemailer = require('nodemailer');
 
 const app = express();
 app.use(cors({ origin: '*', credentials: true }));
 app.use(express.json());
 
-// MongoDB Connection
+// Configure Nodemailer Transporter (Replace with your SMTP details or Gmail App Password)
+const transporter = nodemailer.createTransport({
+  service: 'gmail',
+  auth: {
+    user: process.env.EMAIL_USER || 'finditadmin@gmail.com',
+    pass: process.env.EMAIL_PASS || 'your_email_app_password'
+  }
+});
+
+// MongoDB Connection & Auto Expiration Check
 mongoose.connect(process.env.MONGO_URI || 'mongodb+srv://...', {
   useNewUrlParser: true,
   useUnifiedTopology: true
@@ -17,6 +27,21 @@ mongoose.connect(process.env.MONGO_URI || 'mongodb+srv://...', {
     { name: 'System Admin', password: 'password123', role: 'Admin' },
     { upsert: true, new: true }
   );
+
+  // Feature 3: Automated Item Expiration & Archiving (Runs daily or on boot)
+  try {
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    const dateString = thirtyDaysAgo.toISOString().split('T')[0];
+    
+    await Item.updateMany(
+      { status: { $in: ['Found', 'Lost'] }, dateLostOrFound: { $lte: dateString } },
+      { $set: { status: 'Expired' } }
+    );
+    console.log('Automated expiration check completed.');
+  } catch (err) {
+    console.error('Expiration check error:', err);
+  }
 }).catch(err => console.error('MongoDB connection error:', err));
 
 // Schemas
@@ -39,6 +64,7 @@ const itemSchema = new mongoose.Schema({
   dateLostOrFound: String,
   claimProof: {
     submittedBy: String,
+    submitterEmail: String,
     proofText: String
   }
 });
@@ -80,12 +106,9 @@ app.post('/api/auth/login', async (req, res) => {
 app.patch('/api/auth/update-account', async (req, res) => {
   try {
     const { currentEmail, newEmail, newPassword } = req.body;
-    
     if (newEmail && newEmail.toLowerCase() !== currentEmail.toLowerCase()) {
       const existingUser = await User.findOne({ email: newEmail.toLowerCase() });
-      if (existingUser) {
-        return res.status(400).json({ error: 'New email address is already registered.' });
-      }
+      if (existingUser) return res.status(400).json({ error: 'New email address is already registered.' });
     }
 
     const updateFields = {};
@@ -100,13 +123,7 @@ app.patch('/api/auth/update-account', async (req, res) => {
 
     if (!updatedUser) return res.status(404).json({ error: 'User account not found.' });
 
-    res.json({
-      user: {
-        name: updatedUser.name,
-        email: updatedUser.email,
-        role: updatedUser.role
-      }
-    });
+    res.json({ user: { name: updatedUser.name, email: updatedUser.email, role: updatedUser.role } });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -117,14 +134,10 @@ app.post('/api/auth/reset-password', async (req, res) => {
   try {
     const { email, newPassword } = req.body;
     const user = await User.findOne({ email: email.toLowerCase() });
-    
-    if (!user) {
-      return res.status(404).json({ error: 'No account found associated with this email.' });
-    }
+    if (!user) return res.status(404).json({ error: 'No account found associated with this email.' });
 
     user.password = newPassword;
     await user.save();
-
     res.json({ message: 'Password reset successful! You can now log in.' });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -134,10 +147,13 @@ app.post('/api/auth/reset-password', async (req, res) => {
 // Item Routes
 app.get('/api/items', async (req, res) => {
   try {
-    const { category, status, search, sort } = req.query;
+    const { category, status, search, sort, userEmail } = req.query;
     let query = {};
     if (category && category !== 'All Items') query.category = category;
     if (status && status !== 'All') query.status = status;
+    if (userEmail) {
+      query['claimProof.submitterEmail'] = userEmail.toLowerCase();
+    }
     if (search) {
       query.$or = [
         { title: new RegExp(search, 'i') },
@@ -164,12 +180,13 @@ app.post('/api/items', async (req, res) => {
   }
 });
 
+// Feature 1 & 2: Submit Claim / Report Lead & Save Submitter Email
 app.patch('/api/items/:id/claim', async (req, res) => {
   try {
-    const { submittedBy, proofText } = req.body;
+    const { submittedBy, submitterEmail, proofText } = req.body;
     const updated = await Item.findByIdAndUpdate(
       req.params.id,
-      { status: 'Claim Pending', claimProof: { submittedBy, proofText } },
+      { status: 'Claim Pending', claimProof: { submittedBy, submitterEmail, proofText } },
       { new: true }
     );
     res.json(updated);
@@ -178,9 +195,25 @@ app.patch('/api/items/:id/claim', async (req, res) => {
   }
 });
 
+// Feature 2: Resolve Item and Send Email Notification
 app.patch('/api/items/:id/resolve', async (req, res) => {
   try {
     const updated = await Item.findByIdAndUpdate(req.params.id, { status: 'Resolved' }, { new: true });
+    
+    // Send email notification if submitter email exists
+    if (updated.claimProof && updated.claimProof.submitterEmail) {
+      const mailOptions = {
+        from: '"FindIt Campus Security" <finditadmin@gmail.com>',
+        to: updated.claimProof.submitterEmail,
+        subject: `[FindIt] Your claim for "${updated.title}" has been verified!`,
+        text: `Hello ${updated.claimProof.submittedBy},\n\nYour ownership claim or report for "${updated.title}" has been reviewed and verified by University Security.\n\nPlease visit the Campus Security Desk to retrieve your item.\n\nThank you,\nFindIt Portal System`
+      };
+      
+      transporter.sendMail(mailOptions, (mailErr) => {
+        if (mailErr) console.error('Email notification failed:', mailErr);
+      });
+    }
+
     res.json(updated);
   } catch (err) {
     res.status(500).json({ error: err.message });

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Search, PlusCircle, ShieldCheck, Tag, MapPin, Calendar, X, CheckCircle, AlertCircle, User, LogOut, LayoutDashboard, Trash2, CheckSquare, Settings } from 'lucide-react';
+import { Search, PlusCircle, ShieldCheck, Tag, MapPin, Calendar, X, CheckCircle, AlertCircle, User, LogOut, LayoutDashboard, Trash2, CheckSquare, Settings, Clock } from 'lucide-react';
 import LoginPage from './LoginPage';
 
 const API_URL = 'https://findit-backend-lnq4.onrender.com';
@@ -14,12 +14,12 @@ const CATEGORY_IMAGES = {
 export default function App() {
   const [currentUser, setCurrentUser] = useState(null);
   const [activeTab, setActiveTab] = useState('All Items');
-  const [statusFilter, setStatusFilter] = useState('All'); // 'All', 'Found', 'Lost'
-  const [sortBy, setSortBy] = useState('newest'); // 'newest', 'oldest'
+  const [statusFilter, setStatusFilter] = useState('All');
+  const [sortBy, setSortBy] = useState('newest');
   const [searchQuery, setSearchQuery] = useState('');
   const [items, setItems] = useState([]);
   
-  const [currentView, setCurrentView] = useState('login');
+  const [currentView, setCurrentView] = useState('login'); // 'login', 'catalog', 'admin', 'my-activity'
 
   const [isReportModalOpen, setIsReportModalOpen] = useState(false);
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
@@ -44,7 +44,11 @@ export default function App() {
 
   const fetchItems = async () => {
     try {
-      const res = await fetch(`${API_URL}/api/items?category=${encodeURIComponent(activeTab)}&status=${encodeURIComponent(statusFilter)}&search=${encodeURIComponent(searchQuery)}&sort=${sortBy}`);
+      let url = `${API_URL}/api/items?category=${encodeURIComponent(activeTab)}&status=${encodeURIComponent(statusFilter)}&search=${encodeURIComponent(searchQuery)}&sort=${sortBy}`;
+      if (currentView === 'my-activity' && currentUser) {
+        url += `&userEmail=${encodeURIComponent(currentUser.email)}`;
+      }
+      const res = await fetch(url);
       const data = await res.json();
       setItems(data);
     } catch (err) {
@@ -156,13 +160,14 @@ export default function App() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
           submittedBy: currentUser ? currentUser.name : 'Registered Student', 
+          submitterEmail: currentUser ? currentUser.email : '',
           proofText: actionProofText 
         })
       });
       if (res.ok) {
         setActionSuccessMessage(
           selectedItemForAction.status === 'Found'
-            ? 'Claim submitted successfully! Security will review your ownership proof.'
+            ? 'Claim submitted successfully! Security will review your ownership proof and email you.'
             : 'Found report submitted! The owner and security have been notified.'
         );
         setTimeout(() => {
@@ -237,6 +242,18 @@ export default function App() {
               >
                 <LayoutDashboard className="h-4 w-4" />
                 <span>{currentView === 'admin' ? 'View Catalog' : 'Admin Panel'}</span>
+              </button>
+            )}
+
+            {currentUser && !isAdmin && (
+              <button 
+                onClick={() => setCurrentView(currentView === 'my-activity' ? 'catalog' : 'my-activity')}
+                className={`flex items-center space-x-1.5 px-3.5 py-2 rounded-xl text-xs font-bold transition cursor-pointer ${
+                  currentView === 'my-activity' ? 'bg-indigo-600 text-white shadow-md' : 'bg-indigo-900/80 text-indigo-200 border border-indigo-700'
+                }`}
+              >
+                <Clock className="h-4 w-4" />
+                <span>{currentView === 'my-activity' ? 'View Catalog' : 'My Activity'}</span>
               </button>
             )}
 
@@ -337,7 +354,7 @@ export default function App() {
                         </p>
                         {item.claimProof && item.claimProof.proofText && (
                           <div className="mt-2.5 bg-amber-50 border border-amber-200/70 p-2.5 rounded-xl text-xs text-amber-900">
-                            <span className="font-bold">Student Note ({item.claimProof.submittedBy}):</span> "{item.claimProof.proofText}"
+                            <span className="font-bold">Student Note ({item.claimProof.submittedBy} - {item.claimProof.submitterEmail}):</span> "{item.claimProof.proofText}"
                           </div>
                         )}
                       </div>
@@ -372,9 +389,13 @@ export default function App() {
                 <span className="inline-block bg-indigo-50 text-indigo-700 text-xs font-bold px-3 py-1 rounded-full mb-3 border border-indigo-100">
                   Official University System
                 </span>
-                <h2 className="text-3xl font-black text-slate-900 tracking-tight">Campus Lost & Found Catalog</h2>
+                <h2 className="text-3xl font-black text-slate-900 tracking-tight">
+                  {currentView === 'my-activity' ? 'My Claims & Reports Activity' : 'Campus Lost & Found Catalog'}
+                </h2>
                 <p className="text-slate-600 text-sm mt-2 leading-relaxed">
-                  Browse items turned into security or report a match if you found a student's lost item.
+                  {currentView === 'my-activity' 
+                    ? 'Track the real-time status of items you have claimed or reported.' 
+                    : 'Browse items turned into security or report a match if you found a student\'s lost item.'}
                 </p>
               </div>
 
@@ -385,76 +406,75 @@ export default function App() {
                 </div>
                 <div className="bg-indigo-50/60 border border-indigo-200/80 rounded-2xl p-4 text-center flex-1 lg:w-36 shadow-sm">
                   <span className="block text-2xl font-black text-indigo-600">{items.length}</span>
-                  <span className="text-[10px] font-bold tracking-widest text-indigo-700 uppercase mt-0.5 block">Active Listings</span>
+                  <span className="text-[10px] font-bold tracking-widest text-indigo-700 uppercase mt-0.5 block">{currentView === 'my-activity' ? 'My Submissions' : 'Active Listings'}</span>
                 </div>
               </div>
             </div>
 
-            {/* Filter Controls & Search */}
-            <div className="flex flex-col gap-4 mb-8">
-              <div className="flex flex-wrap items-center justify-between gap-4">
-                <div className="flex flex-wrap gap-2">
-                  {categories.map((category) => (
-                    <button
-                      key={category}
-                      onClick={() => setActiveTab(category)}
-                      className={`px-5 py-2.5 rounded-xl text-sm font-semibold transition cursor-pointer shadow-sm ${
-                        activeTab === category
-                          ? 'bg-indigo-950 text-white shadow'
-                          : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200/80'
-                      }`}
-                    >
-                      {category}
-                    </button>
-                  ))}
+            {currentView !== 'my-activity' && (
+              <div className="flex flex-col gap-4 mb-8">
+                <div className="flex flex-wrap items-center justify-between gap-4">
+                  <div className="flex flex-wrap gap-2">
+                    {categories.map((category) => (
+                      <button
+                        key={category}
+                        onClick={() => setActiveTab(category)}
+                        className={`px-5 py-2.5 rounded-xl text-sm font-semibold transition cursor-pointer shadow-sm ${
+                          activeTab === category
+                            ? 'bg-indigo-950 text-white shadow'
+                            : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200/80'
+                        }`}
+                      >
+                        {category}
+                      </button>
+                    ))}
+                  </div>
+
+                  <div className="relative w-full lg:w-80">
+                    <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                    <input
+                      type="text"
+                      placeholder="Search title, location, or tag..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-200/80 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-600 shadow-sm transition"
+                    />
+                  </div>
                 </div>
 
-                <div className="relative w-full lg:w-80">
-                  <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-                  <input
-                    type="text"
-                    placeholder="Search title, location, or tag..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-200/80 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-600 shadow-sm transition"
-                  />
+                <div className="flex flex-wrap items-center justify-between gap-4 bg-white p-4 rounded-2xl border border-slate-200/80 shadow-sm">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-bold text-slate-500 uppercase">Status:</span>
+                    {['All', 'Found', 'Lost'].map((st) => (
+                      <button
+                        key={st}
+                        onClick={() => setStatusFilter(st)}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
+                          statusFilter === st
+                            ? 'bg-indigo-600 text-white'
+                            : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                        }`}
+                      >
+                        {st}
+                      </button>
+                    ))}
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-bold text-slate-500 uppercase">Sort By:</span>
+                    <select
+                      value={sortBy}
+                      onChange={(e) => setSortBy(e.target.value)}
+                      className="px-3 py-1.5 bg-slate-100 border border-slate-200 rounded-lg text-xs font-bold text-slate-700 outline-none cursor-pointer"
+                    >
+                      <option value="newest">Newest First</option>
+                      <option value="oldest">Oldest First</option>
+                    </select>
+                  </div>
                 </div>
               </div>
+            )}
 
-              {/* Status and Sort Controls Sub-bar */}
-              <div className="flex flex-wrap items-center justify-between gap-4 bg-white p-4 rounded-2xl border border-slate-200/80 shadow-sm">
-                <div className="flex items-center gap-2">
-                  <span className="text-xs font-bold text-slate-500 uppercase">Status:</span>
-                  {['All', 'Found', 'Lost'].map((st) => (
-                    <button
-                      key={st}
-                      onClick={() => setStatusFilter(st)}
-                      className={`px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
-                        statusFilter === st
-                          ? 'bg-indigo-600 text-white'
-                          : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                      }`}
-                    >
-                      {st}
-                    </button>
-                  ))}
-                </div>
-
-                <div className="flex items-center gap-2">
-                  <span className="text-xs font-bold text-slate-500 uppercase">Sort By:</span>
-                  <select
-                    value={sortBy}
-                    onChange={(e) => setSortBy(e.target.value)}
-                    className="px-3 py-1.5 bg-slate-100 border border-slate-200 rounded-lg text-xs font-bold text-slate-700 outline-none cursor-pointer"
-                  >
-                    <option value="newest">Newest First</option>
-                    <option value="oldest">Oldest First</option>
-                  </select>
-                </div>
-              </div>
-            </div>
-
-            {/* Catalog Grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {items.map((item) => (
                 <div key={item._id} className="bg-white rounded-2xl border border-slate-200/80 shadow-sm hover:shadow-md transition overflow-hidden flex flex-col group">
@@ -492,7 +512,7 @@ export default function App() {
                           <span>{item.dateLostOrFound}</span>
                         </div>
                         
-                        {(item.status === 'Found' || item.status === 'Lost') && (
+                        {currentView !== 'my-activity' && (item.status === 'Found' || item.status === 'Lost') && (
                           <button 
                             onClick={() => handleOpenActionModal(item)}
                             className={`font-bold px-3 py-1.5 rounded-lg transition cursor-pointer text-xs flex items-center gap-1 ${
