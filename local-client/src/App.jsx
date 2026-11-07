@@ -422,17 +422,19 @@ export default function App() {
                           <span>{item.dateLostOrFound}</span>
                         </div>
                         
-                        {/* Dynamic Action Button: Claim Item vs I Found This! */}
-                        <button 
-                          onClick={() => handleOpenActionModal(item)}
-                          className={`font-bold px-3 py-1.5 rounded-lg transition cursor-pointer text-xs flex items-center gap-1 ${
-                            item.status === 'Found' 
-                              ? 'bg-indigo-50 hover:bg-indigo-100 text-indigo-700' 
-                              : 'bg-emerald-50 hover:bg-emerald-100 text-emerald-700'
-                          }`}
-                        >
-                          {item.status === 'Found' ? 'Claim Item →' : 'I Found This! →'}
-                        </button>
+                        {/* Dynamic Action Button: Only show if status is Found or Lost */}
+                        {(item.status === 'Found' || item.status === 'Lost') && (
+                          <button 
+                            onClick={() => handleOpenActionModal(item)}
+                            className={`font-bold px-3 py-1.5 rounded-lg transition cursor-pointer text-xs flex items-center gap-1 ${
+                              item.status === 'Found' 
+                                ? 'bg-indigo-50 hover:bg-indigo-100 text-indigo-700' 
+                                : 'bg-emerald-50 hover:bg-emerald-100 text-emerald-700'
+                            }`}
+                          >
+                            {item.status === 'Found' ? 'Claim Item →' : 'I Found This! →'}
+                          </button>
+                        )}
                       </div>
                     </div>
                   </div>
