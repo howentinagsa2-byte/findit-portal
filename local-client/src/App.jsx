@@ -86,6 +86,15 @@ export default function App() {
     }
   }, [activeTab, statusFilter, searchQuery, sortBy, currentView]);
 
+  // Real-time background polling for student notifications every 10 seconds
+  useEffect(() => {
+    if (!currentUser || currentUser.email.toLowerCase() === 'finditadmin@gmail.com') return;
+    const interval = setInterval(() => {
+      fetchNotifications();
+    }, 10000);
+    return () => clearInterval(interval);
+  }, [currentUser]);
+
   const isAdmin = currentUser && currentUser.email.toLowerCase() === 'finditadmin@gmail.com';
 
   const handleLoginSuccess = (user) => {
@@ -224,7 +233,10 @@ export default function App() {
     if (!isAdmin) return;
     try {
       const res = await fetch(`${API_URL}/api/items/${id}/resolve`, { method: 'PATCH' });
-      if (res.ok) fetchItems();
+      if (res.ok) {
+        await fetchItems();
+        await fetchNotifications();
+      }
     } catch (err) {
       console.error('Failed to resolve item:', err);
     }
