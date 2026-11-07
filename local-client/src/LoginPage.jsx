@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
-import { ShieldCheck, User, Lock, ArrowLeft } from 'lucide-react';
+import { ShieldCheck, User, Lock, ArrowRight } from 'lucide-react';
 
 const API_URL = 'https://findit-backend-lnq4.onrender.com';
 
-export default function LoginPage({ onLoginSuccess, onCancel }) {
+export default function LoginPage({ onLoginSuccess, onGuestAccess }) {
   const [authMode, setAuthMode] = useState('login'); // 'login' or 'signup'
   const [authForm, setAuthForm] = useState({ name: '', email: '', password: '', role: 'Student' });
   const [authError, setAuthError] = useState('');
@@ -36,23 +36,15 @@ export default function LoginPage({ onLoginSuccess, onCancel }) {
     <div className="min-h-screen bg-slate-100 flex items-center justify-center p-4 font-sans">
       <div className="max-w-md w-full bg-white rounded-3xl shadow-xl border border-slate-200/80 overflow-hidden">
         {/* Top Header */}
-        <div className="bg-indigo-950 p-8 text-white text-center relative">
-          <button 
-            onClick={onCancel}
-            className="absolute top-4 left-4 p-2 bg-indigo-900/80 hover:bg-indigo-800 text-indigo-200 rounded-xl transition cursor-pointer"
-            title="Back to Catalog"
-          >
-            <ArrowLeft className="h-4 w-4" />
-          </button>
-          
-          <div className="inline-flex bg-indigo-600 p-3 rounded-2xl shadow-inner mb-3">
+        <div className="bg-indigo-950 p-8 text-white text-center">
+          <div className="inline-flex bg-indigo-600 p-3.5 rounded-2xl shadow-inner mb-3">
             <ShieldCheck className="h-8 w-8 text-white" />
           </div>
-          <h2 className="text-2xl font-extrabold tracking-tight">FindIt Portal</h2>
-          <p className="text-xs text-indigo-200 mt-1">Campus Lost and Found Account Gateway</p>
+          <h2 className="text-2xl font-extrabold tracking-tight">Welcome to FindIt</h2>
+          <p className="text-xs text-indigo-200 mt-1">Campus Lost and Found Portal</p>
         </div>
 
-        {/* Tab Switcher */}
+        {/* Auth Mode Tabs */}
         <div className="flex border-b border-slate-100 bg-slate-50">
           <button
             onClick={() => { setAuthMode('login'); setAuthError(''); }}
@@ -141,12 +133,14 @@ export default function LoginPage({ onLoginSuccess, onCancel }) {
             </button>
           </form>
 
-          <div className="mt-6 text-center">
+          {/* Continue as Guest */}
+          <div className="mt-6 pt-6 border-t border-slate-100 text-center">
             <button
-              onClick={onCancel}
-              className="text-xs text-slate-500 hover:text-slate-800 font-semibold cursor-pointer"
+              onClick={onGuestAccess}
+              className="inline-flex items-center gap-1.5 text-xs text-slate-500 hover:text-indigo-600 font-semibold cursor-pointer transition"
             >
-              ← Back to Public Catalog
+              <span>Browse Catalog as Guest</span>
+              <ArrowRight className="h-3.5 w-3.5" />
             </button>
           </div>
         </div>

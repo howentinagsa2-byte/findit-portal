@@ -16,7 +16,9 @@ export default function App() {
   const [activeTab, setActiveTab] = useState('All Items');
   const [searchQuery, setSearchQuery] = useState('');
   const [items, setItems] = useState([]);
-  const [currentView, setCurrentView] = useState('catalog'); // 'catalog', 'admin', or 'login'
+  
+  // Set default view to 'login' so the authentication page shows first!
+  const [currentView, setCurrentView] = useState('login'); // 'login', 'catalog', or 'admin'
 
   const [isReportModalOpen, setIsReportModalOpen] = useState(false);
   const [selectedItemForClaim, setSelectedItemForClaim] = useState(null);
@@ -46,8 +48,10 @@ export default function App() {
   };
 
   useEffect(() => {
-    fetchItems();
-  }, [activeTab, searchQuery]);
+    if (currentView !== 'login') {
+      fetchItems();
+    }
+  }, [activeTab, searchQuery, currentView]);
 
   const handleAddItem = async (e) => {
     e.preventDefault();
@@ -128,7 +132,7 @@ export default function App() {
 
   const isAdmin = currentUser && currentUser.email.toLowerCase() === 'finditadmin@gmail.com';
 
-  // Standalone Login Page View
+  // Render Login Page First
   if (currentView === 'login') {
     return (
       <LoginPage
@@ -136,7 +140,7 @@ export default function App() {
           setCurrentUser(user);
           setCurrentView(user.email.toLowerCase() === 'finditadmin@gmail.com' ? 'admin' : 'catalog');
         }}
-        onCancel={() => setCurrentView('catalog')}
+        onGuestAccess={() => setCurrentView('catalog')}
       />
     );
   }
@@ -176,7 +180,7 @@ export default function App() {
                   <span className="text-xs font-bold">{currentUser.name} {isAdmin && '(Admin)'}</span>
                 </div>
                 <button 
-                  onClick={() => { setCurrentUser(null); setCurrentView('catalog'); }}
+                  onClick={() => { setCurrentUser(null); setCurrentView('login'); }}
                   className="p-2 bg-indigo-900 hover:bg-rose-900/80 text-indigo-200 hover:text-white rounded-xl transition cursor-pointer"
                   title="Log Out"
                 >
