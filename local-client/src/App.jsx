@@ -17,8 +17,8 @@ export default function App() {
   const [searchQuery, setSearchQuery] = useState('');
   const [items, setItems] = useState([]);
   
-  // Set default view to 'login' so the authentication page shows first!
-  const [currentView, setCurrentView] = useState('login'); // 'login', 'catalog', or 'admin'
+  // Controls current view: 'login', 'catalog', or 'admin'
+  const [currentView, setCurrentView] = useState('login');
 
   const [isReportModalOpen, setIsReportModalOpen] = useState(false);
   const [selectedItemForClaim, setSelectedItemForClaim] = useState(null);
@@ -53,6 +53,26 @@ export default function App() {
     }
   }, [activeTab, searchQuery, currentView]);
 
+  // Guard action: require login before opening Report Item modal
+  const handleOpenReportModal = () => {
+    if (!currentUser) {
+      alert('Please log in or create an account to post a listing.');
+      setCurrentView('login');
+      return;
+    }
+    setIsReportModalOpen(true);
+  };
+
+  // Guard action: require login before claiming an item
+  const handleOpenClaimModal = (item) => {
+    if (!currentUser) {
+      alert('Please log in or create an account to submit an ownership claim.');
+      setCurrentView('login');
+      return;
+    }
+    setSelectedItemForClaim(item);
+  };
+
   const handleAddItem = async (e) => {
     e.preventDefault();
     if (!newItem.title || !newItem.location) return;
@@ -65,7 +85,7 @@ export default function App() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           ...newItem,
-          postedBy: currentUser ? currentUser.name : 'Guest User',
+          postedBy: currentUser ? currentUser.name : 'Registered User',
           imageUrl: selectedImageUrl
         })
       });
@@ -95,7 +115,10 @@ export default function App() {
       const res = await fetch(`${API_URL}/api/items/${selectedItemForClaim._id}/claim`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ submittedBy: currentUser ? currentUser.name : 'Anonymous Student', proofText: claimProof })
+        body: JSON.stringify({ 
+          submittedBy: currentUser ? currentUser.name : 'Registered Student', 
+          proofText: claimProof 
+        })
       });
       if (res.ok) {
         setClaimSuccessMessage('Claim submitted successfully! University Security will review your proof.');
@@ -132,7 +155,7 @@ export default function App() {
 
   const isAdmin = currentUser && currentUser.email.toLowerCase() === 'finditadmin@gmail.com';
 
-  // Render Login Page First
+  // Standalone Login Page
   if (currentView === 'login') {
     return (
       <LoginPage
@@ -147,7 +170,7 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-800 font-sans pb-12">
-      {/* Top Header */}
+      {/* Top Navigation Bar */}
       <header className="bg-indigo-950 text-white shadow-md sticky top-0 z-40">
         <div className="max-w-7xl mx-auto px-6 py-3.5 flex items-center justify-between">
           <div className="flex items-center space-x-3 cursor-pointer" onClick={() => setCurrentView('catalog')}>
@@ -197,7 +220,7 @@ export default function App() {
             )}
 
             <button 
-              onClick={() => setIsReportModalOpen(true)}
+              onClick={handleOpenReportModal}
               className="flex items-center space-x-2 bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 rounded-xl text-sm font-semibold transition shadow-md cursor-pointer"
             >
               <PlusCircle className="h-4 w-4" />
@@ -207,10 +230,10 @@ export default function App() {
         </div>
       </header>
 
-      {/* Main Container */}
+      {/* Main Catalog / Admin Body */}
       <main className="max-w-7xl mx-auto px-6 pt-8">
         {currentView === 'admin' && isAdmin ? (
-          /* ADMIN DASHBOARD VIEW */
+          /* ADMIN VIEW */
           <div className="space-y-6">
             <div className="bg-white rounded-2xl shadow-sm border border-slate-200/80 p-8 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
               <div>
@@ -291,7 +314,7 @@ export default function App() {
             </div>
           </div>
         ) : (
-          /* STANDARD CATALOG VIEW */
+          /* PUBLIC CATALOG VIEW */
           <>
             <div className="bg-white rounded-2xl shadow-sm border border-slate-200/80 p-8 mb-8 flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6">
               <div className="max-w-2xl">
@@ -316,7 +339,7 @@ export default function App() {
               </div>
             </div>
 
-            {/* Filter Tabs and Search Bar */}
+            {/* Filters and Search */}
             <div className="flex flex-col lg:flex-row items-center justify-between gap-4 mb-8">
               <div className="flex flex-wrap gap-2 w-full lg:w-auto">
                 {categories.map((category) => (
@@ -384,7 +407,7 @@ export default function App() {
                           <span>{item.dateLostOrFound}</span>
                         </div>
                         <button 
-                          onClick={() => setSelectedItemForClaim(item)}
+                          onClick={() => handleOpenClaimModal(item)}
                           className="bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold px-3 py-1.5 rounded-lg transition cursor-pointer"
                         >
                           Claim Item →
