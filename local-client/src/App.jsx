@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Search, PlusCircle, ShieldCheck, Tag, MapPin, Calendar, X, CheckCircle, AlertCircle, User, LogOut, LayoutDashboard, Trash2, CheckSquare, Settings, Lock } from 'lucide-react';
+import { Search, PlusCircle, ShieldCheck, Tag, MapPin, Calendar, X, CheckCircle, AlertCircle, User, LogOut, LayoutDashboard, Trash2, CheckSquare, Settings } from 'lucide-react';
 import LoginPage from './LoginPage';
 
 const API_URL = 'https://findit-backend-lnq4.onrender.com';
@@ -14,17 +14,18 @@ const CATEGORY_IMAGES = {
 export default function App() {
   const [currentUser, setCurrentUser] = useState(null);
   const [activeTab, setActiveTab] = useState('All Items');
+  const [statusFilter, setStatusFilter] = useState('All'); // 'All', 'Found', 'Lost'
+  const [sortBy, setSortBy] = useState('newest'); // 'newest', 'oldest'
   const [searchQuery, setSearchQuery] = useState('');
   const [items, setItems] = useState([]);
   
-  const [currentView, setCurrentView] = useState('login'); // 'login', 'catalog', or 'admin'
+  const [currentView, setCurrentView] = useState('login');
 
   const [isReportModalOpen, setIsReportModalOpen] = useState(false);
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
   const [selectedItemForAction, setSelectedItemForAction] = useState(null);
   const [actionSuccessMessage, setActionSuccessMessage] = useState('');
 
-  // Settings State
   const [settingsForm, setSettingsForm] = useState({ newEmail: '', newPassword: '' });
   const [settingsStatus, setSettingsStatus] = useState({ error: '', success: '' });
 
@@ -43,7 +44,7 @@ export default function App() {
 
   const fetchItems = async () => {
     try {
-      const res = await fetch(`${API_URL}/api/items?category=${encodeURIComponent(activeTab)}&search=${encodeURIComponent(searchQuery)}`);
+      const res = await fetch(`${API_URL}/api/items?category=${encodeURIComponent(activeTab)}&status=${encodeURIComponent(statusFilter)}&search=${encodeURIComponent(searchQuery)}&sort=${sortBy}`);
       const data = await res.json();
       setItems(data);
     } catch (err) {
@@ -55,7 +56,7 @@ export default function App() {
     if (currentView !== 'login') {
       fetchItems();
     }
-  }, [activeTab, searchQuery, currentView]);
+  }, [activeTab, statusFilter, searchQuery, sortBy, currentView]);
 
   const isAdmin = currentUser && currentUser.email.toLowerCase() === 'finditadmin@gmail.com';
 
@@ -214,7 +215,6 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-800 font-sans pb-12">
-      {/* Top Header */}
       <header className="bg-indigo-950 text-white shadow-md sticky top-0 z-40">
         <div className="max-w-7xl mx-auto px-6 py-3.5 flex items-center justify-between">
           <div className="flex items-center space-x-3 cursor-pointer" onClick={() => setCurrentView('catalog')}>
@@ -285,7 +285,6 @@ export default function App() {
         </div>
       </header>
 
-      {/* Main Catalog / Admin View */}
       <main className="max-w-7xl mx-auto px-6 pt-8">
         {currentView === 'admin' && isAdmin ? (
           <div className="space-y-6">
@@ -391,35 +390,71 @@ export default function App() {
               </div>
             </div>
 
-            <div className="flex flex-col lg:flex-row items-center justify-between gap-4 mb-8">
-              <div className="flex flex-wrap gap-2 w-full lg:w-auto">
-                {categories.map((category) => (
-                  <button
-                    key={category}
-                    onClick={() => setActiveTab(category)}
-                    className={`px-5 py-2.5 rounded-xl text-sm font-semibold transition cursor-pointer shadow-sm ${
-                      activeTab === category
-                        ? 'bg-indigo-950 text-white shadow'
-                        : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200/80'
-                    }`}
-                  >
-                    {category}
-                  </button>
-                ))}
+            {/* Filter Controls & Search */}
+            <div className="flex flex-col gap-4 mb-8">
+              <div className="flex flex-wrap items-center justify-between gap-4">
+                <div className="flex flex-wrap gap-2">
+                  {categories.map((category) => (
+                    <button
+                      key={category}
+                      onClick={() => setActiveTab(category)}
+                      className={`px-5 py-2.5 rounded-xl text-sm font-semibold transition cursor-pointer shadow-sm ${
+                        activeTab === category
+                          ? 'bg-indigo-950 text-white shadow'
+                          : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200/80'
+                      }`}
+                    >
+                      {category}
+                    </button>
+                  ))}
+                </div>
+
+                <div className="relative w-full lg:w-80">
+                  <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                  <input
+                    type="text"
+                    placeholder="Search title, location, or tag..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-200/80 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-600 shadow-sm transition"
+                  />
+                </div>
               </div>
 
-              <div className="relative w-full lg:w-80">
-                <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-                <input
-                  type="text"
-                  placeholder="Search title, location, or tag..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-200/80 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-600 shadow-sm transition"
-                />
+              {/* Status and Sort Controls Sub-bar */}
+              <div className="flex flex-wrap items-center justify-between gap-4 bg-white p-4 rounded-2xl border border-slate-200/80 shadow-sm">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-bold text-slate-500 uppercase">Status:</span>
+                  {['All', 'Found', 'Lost'].map((st) => (
+                    <button
+                      key={st}
+                      onClick={() => setStatusFilter(st)}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
+                        statusFilter === st
+                          ? 'bg-indigo-600 text-white'
+                          : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                      }`}
+                    >
+                      {st}
+                    </button>
+                  ))}
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-bold text-slate-500 uppercase">Sort By:</span>
+                  <select
+                    value={sortBy}
+                    onChange={(e) => setSortBy(e.target.value)}
+                    className="px-3 py-1.5 bg-slate-100 border border-slate-200 rounded-lg text-xs font-bold text-slate-700 outline-none cursor-pointer"
+                  >
+                    <option value="newest">Newest First</option>
+                    <option value="oldest">Oldest First</option>
+                  </select>
+                </div>
               </div>
             </div>
 
+            {/* Catalog Grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {items.map((item) => (
                 <div key={item._id} className="bg-white rounded-2xl border border-slate-200/80 shadow-sm hover:shadow-md transition overflow-hidden flex flex-col group">
@@ -479,7 +514,7 @@ export default function App() {
         )}
       </main>
 
-      {/* MODAL: Account Settings (Change Email & Password) */}
+      {/* Account Settings Modal */}
       {isSettingsModalOpen && (
         <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 relative border border-slate-100">
@@ -548,7 +583,7 @@ export default function App() {
         </div>
       )}
 
-      {/* MODAL: Report Item (Admin Only) */}
+      {/* Report Modal */}
       {isReportModalOpen && isAdmin && (
         <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 relative border border-slate-100">
@@ -644,7 +679,7 @@ export default function App() {
         </div>
       )}
 
-      {/* DYNAMIC MODAL: Claim Found Item OR Report Finding a Lost Item */}
+      {/* Action Modal */}
       {selectedItemForAction && (
         <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 relative border border-slate-100">

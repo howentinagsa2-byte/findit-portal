@@ -12,7 +12,6 @@ mongoose.connect(process.env.MONGO_URI || 'mongodb+srv://...', {
   useUnifiedTopology: true
 }).then(async () => {
   console.log('MongoDB connected successfully');
-  // Secure Admin Upsert
   await User.findOneAndUpdate(
     { email: 'finditadmin@gmail.com' },
     { name: 'System Admin', password: 'password123', role: 'Admin' },
@@ -77,7 +76,7 @@ app.post('/api/auth/login', async (req, res) => {
   }
 });
 
-// Auth Routes: Update Account (Change Email & Password)
+// Auth Routes: Update Account
 app.patch('/api/auth/update-account', async (req, res) => {
   try {
     const { currentEmail, newEmail, newPassword } = req.body;
@@ -113,7 +112,7 @@ app.patch('/api/auth/update-account', async (req, res) => {
   }
 });
 
-// Auth Routes: Reset Password (Forgot Password)
+// Auth Routes: Reset Password
 app.post('/api/auth/reset-password', async (req, res) => {
   try {
     const { email, newPassword } = req.body;
@@ -135,9 +134,10 @@ app.post('/api/auth/reset-password', async (req, res) => {
 // Item Routes
 app.get('/api/items', async (req, res) => {
   try {
-    const { category, search } = req.query;
+    const { category, status, search, sort } = req.query;
     let query = {};
     if (category && category !== 'All Items') query.category = category;
+    if (status && status !== 'All') query.status = status;
     if (search) {
       query.$or = [
         { title: new RegExp(search, 'i') },
@@ -145,7 +145,9 @@ app.get('/api/items', async (req, res) => {
         { description: new RegExp(search, 'i') }
       ];
     }
-    const items = await Item.find(query).sort({ _id: -1 });
+    
+    const sortOrder = sort === 'oldest' ? 1 : -1;
+    const items = await Item.find(query).sort({ _id: sortOrder });
     res.json(items);
   } catch (err) {
     res.status(500).json({ error: err.message });
