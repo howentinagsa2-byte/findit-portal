@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Search, PlusCircle, ShieldCheck, Tag, MapPin, Calendar, X, CheckCircle, AlertCircle, User, LogOut, Lock, LayoutDashboard, Trash2, CheckSquare } from 'lucide-react';
+import { Search, PlusCircle, ShieldCheck, Tag, MapPin, Calendar, X, CheckCircle, AlertCircle, User, LogOut, LayoutDashboard, Trash2, CheckSquare } from 'lucide-react';
 
-const API_URL = import.meta.env.VITE_API_URL || 'https://findit-backend-lnq4.onrender.com';
+const API_URL = 'https://findit-backend-lnq4.onrender.com';
 
 export default function App() {
   const [currentUser, setCurrentUser] = useState(null);
@@ -237,7 +237,7 @@ export default function App() {
             <div className="bg-white rounded-2xl shadow-sm border border-slate-200/80 overflow-hidden">
               <div className="px-6 py-4 border-b border-slate-100 font-bold text-slate-900 text-sm flex items-center justify-between">
                 <span>All Registry Items & Claims</span>
-                <span className="text-xs text-slate-500 font-normal">Authorized User: howenbotortinagsa@gmail.com</span>
+                <span className="text-xs text-slate-500 font-normal">Authorized Admin: finditadmin@gmail.com</span>
               </div>
               <div className="divide-y divide-slate-100">
                 {items.map((item) => (
@@ -257,7 +257,7 @@ export default function App() {
                         </div>
                         <h4 className="font-bold text-slate-900 text-base">{item.title}</h4>
                         <p className="text-xs text-slate-500 flex items-center gap-1 mt-0.5">
-                          <MapPin className="h-3.5 w-3.5" /> {item.location} • Posted by {item.postedBy}
+                          <MapPin className="h-3.5 w-3.5" /> {item.location} | Posted by {item.postedBy}
                         </p>
                         {item.claimProof && item.claimProof.proofText && (
                           <div className="mt-2.5 bg-amber-50 border border-amber-200/70 p-2.5 rounded-xl text-xs text-amber-900">
