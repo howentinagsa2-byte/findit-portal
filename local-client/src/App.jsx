@@ -53,17 +53,23 @@ export default function App() {
     }
   }, [activeTab, searchQuery, currentView]);
 
-  // Guard action: require login before opening Report Item modal
+  const isAdmin = currentUser && currentUser.email.toLowerCase() === 'finditadmin@gmail.com';
+
+  // Strict Guard Action: Only Admin can open Report Item modal
   const handleOpenReportModal = () => {
     if (!currentUser) {
-      alert('Please log in or create an account to post a listing.');
+      alert('Please log in with an administrator account to post listings.');
       setCurrentView('login');
+      return;
+    }
+    if (!isAdmin) {
+      alert('Access Restricted: Only campus administrators can post new items to the registry.');
       return;
     }
     setIsReportModalOpen(true);
   };
 
-  // Guard action: require login before claiming an item
+  // Guard Action: Students/Users must be logged in to claim items
   const handleOpenClaimModal = (item) => {
     if (!currentUser) {
       alert('Please log in or create an account to submit an ownership claim.');
@@ -77,6 +83,11 @@ export default function App() {
     e.preventDefault();
     if (!newItem.title || !newItem.location) return;
 
+    if (!isAdmin) {
+      alert('Unauthorized operation.');
+      return;
+    }
+
     const selectedImageUrl = CATEGORY_IMAGES[newItem.category] || CATEGORY_IMAGES['Personal Items'];
 
     try {
@@ -85,7 +96,7 @@ export default function App() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           ...newItem,
-          postedBy: currentUser ? currentUser.name : 'Registered User',
+          postedBy: currentUser.name,
           imageUrl: selectedImageUrl
         })
       });
@@ -135,6 +146,7 @@ export default function App() {
   };
 
   const handleResolveItem = async (id) => {
+    if (!isAdmin) return;
     try {
       const res = await fetch(`${API_URL}/api/items/${id}/resolve`, { method: 'PATCH' });
       if (res.ok) fetchItems();
@@ -144,6 +156,10 @@ export default function App() {
   };
 
   const handleDeleteItem = async (id) => {
+    if (!isAdmin) {
+      alert('Access Restricted: Only administrators can delete listings.');
+      return;
+    }
     if (!window.confirm('Are you sure you want to delete this listing?')) return;
     try {
       const res = await fetch(`${API_URL}/api/items/${id}`, { method: 'DELETE' });
@@ -153,9 +169,7 @@ export default function App() {
     }
   };
 
-  const isAdmin = currentUser && currentUser.email.toLowerCase() === 'finditadmin@gmail.com';
-
-  // Standalone Login Page
+  // Standalone Login Page View
   if (currentView === 'login') {
     return (
       <LoginPage
@@ -170,7 +184,7 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-800 font-sans pb-12">
-      {/* Top Navigation Bar */}
+      {/* Top Header */}
       <header className="bg-indigo-950 text-white shadow-md sticky top-0 z-40">
         <div className="max-w-7xl mx-auto px-6 py-3.5 flex items-center justify-between">
           <div className="flex items-center space-x-3 cursor-pointer" onClick={() => setCurrentView('catalog')}>
@@ -219,21 +233,23 @@ export default function App() {
               </button>
             )}
 
-            <button 
-              onClick={handleOpenReportModal}
-              className="flex items-center space-x-2 bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 rounded-xl text-sm font-semibold transition shadow-md cursor-pointer"
-            >
-              <PlusCircle className="h-4 w-4" />
-              <span>Report Item</span>
-            </button>
+            {isAdmin && (
+              <button 
+                onClick={handleOpenReportModal}
+                className="flex items-center space-x-2 bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 rounded-xl text-sm font-semibold transition shadow-md cursor-pointer"
+              >
+                <PlusCircle className="h-4 w-4" />
+                <span>Report Item</span>
+              </button>
+            )}
           </div>
         </div>
       </header>
 
-      {/* Main Catalog / Admin Body */}
+      {/* Main Container */}
       <main className="max-w-7xl mx-auto px-6 pt-8">
         {currentView === 'admin' && isAdmin ? (
-          /* ADMIN VIEW */
+          /* ADMIN DASHBOARD VIEW */
           <div className="space-y-6">
             <div className="bg-white rounded-2xl shadow-sm border border-slate-200/80 p-8 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
               <div>
@@ -323,7 +339,7 @@ export default function App() {
                 </span>
                 <h2 className="text-3xl font-black text-slate-900 tracking-tight">Campus Lost & Found Catalog</h2>
                 <p className="text-slate-600 text-sm mt-2 leading-relaxed">
-                  Securely report lost belongings or claim recovered campus items verified by University Security and Student Services.
+                  Securely browse lost belongings or submit an ownership claim verified by University Security and Student Services.
                 </p>
               </div>
 
@@ -339,7 +355,7 @@ export default function App() {
               </div>
             </div>
 
-            {/* Filters and Search */}
+            {/* Filter Tabs and Search Bar */}
             <div className="flex flex-col lg:flex-row items-center justify-between gap-4 mb-8">
               <div className="flex flex-wrap gap-2 w-full lg:w-auto">
                 {categories.map((category) => (
@@ -422,8 +438,8 @@ export default function App() {
         )}
       </main>
 
-      {/* MODAL: Report Item */}
-      {isReportModalOpen && (
+      {/* MODAL: Report Item (Admin Only) */}
+      {isReportModalOpen && isAdmin && (
         <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 relative border border-slate-100">
             <button 
